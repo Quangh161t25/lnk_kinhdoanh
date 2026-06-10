@@ -412,31 +412,6 @@
       justify-content: flex-end
     }
 
-    .datetime-chip {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-      padding: 10px 16px;
-      border: 1px solid #e5ecf7;
-      border-radius: 999px;
-      background: #fff
-    }
-
-    .datetime-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #28436d
-    }
-
-    .datetime-item svg {
-      width: 15px;
-      height: 15px;
-      stroke: #5f6fff;
-      fill: none
-    }
-
     .chip {
       background: #fff;
       border: 1px solid var(--line);
@@ -953,8 +928,4 @@
         padding: 12px 14px
       }
 
-      .datetime-chip {
-        width: 100%;
-        justify-content: space-between
-      }
     }

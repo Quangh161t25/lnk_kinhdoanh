@@ -43,8 +43,6 @@
       navList: document.getElementById("navList"),
       pageTitle: document.getElementById("pageTitle"),
       pageSubtitle: document.getElementById("pageSubtitle"),
-      clockChip: document.getElementById("clockChip"),
-      dateChip: document.getElementById("dateChip"),
       userChip: document.getElementById("userChip"),
       reloadSheetsBtn: document.getElementById("reloadSheetsBtn"),
       logoutBtn: document.getElementById("logoutBtn"),
@@ -377,9 +375,6 @@
       toggle.onclick = (e) => { e.stopPropagation(); dropdown.style.display = dropdown.style.display === "block" ? "none" : "block"; };
       document.addEventListener("click", () => { dropdown.style.display = "none"; }, { once: false });
       dropdown.addEventListener("click", (e) => e.stopPropagation());
-
-      // Reload bell
-      document.getElementById("reloadBellBtn").onclick = () => document.getElementById("reloadSheetsBtn").click();
     }
 
     function toggleSidebar() {
@@ -405,8 +400,25 @@
       el.navList.querySelectorAll(".nav-btn").forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.tab)));
     }
 
+    function renderActiveSection(tabId = activeTab) {
+      const renderers = {
+        dashboard: renderDashboard,
+        sales_dashboard: renderSalesDashboard,
+        customers: renderCustomers,
+        products: renderProducts,
+        order_details: renderOrderDetails,
+        debts: renderDebts,
+        kpi: renderKpi,
+        thuong: renderThuong,
+        ti_trong: renderTiTrong,
+        sync: renderSync
+      };
+      (renderers[tabId] || renderDashboard)();
+    }
+
     function switchTab(tabId) {
       activeTab = tabId;
+      renderActiveSection(tabId);
       renderNav();
       document.querySelectorAll(".section").forEach((section) => section.classList.toggle("active", section.id === tabId));
       const meta = NAV_ITEMS.find((item) => item.id === tabId) || NAV_ITEMS[0];
@@ -1016,7 +1028,7 @@
           const { banHang, thuNo, congNo } = item._stats;
           const highDebt = congNo > 10000000;
           const badge = congNo === 0 ? '<span class="badge-status bs-paid">Đã TT</span>' : congNo > 0 ? '<span class="badge-status bs-owe">Còn nợ</span>' : '<span class="badge-status bs-credit">Dư tiền</span>';
-          return `<tr data-action="view-customer" data-id="${safeText(item.id)}" class="${highDebt ? 'row-debt-high' : ''}" style="cursor:pointer" onclick="openCustomerDrawer('${safeText(item.id)}')"><td class="mono">${safeText(item.id)}</td><td style="${highDebt ? 'color:#dc2626;font-weight:700' : ''}">${safeText(item.ten_kh)}</td><td>${safeText(item.dien_thoai || "")}</td><td>${safeText(item.email || "")}</td><td>${safeText(item.nv_quan_ly || "")}</td><td style="font-weight:600">${safeText(item.kenh || "")}</td><td style="font-weight:600; text-align:center">${safeText(item.tt || "")}</td><td>${money(banHang)}</td><td>${money(thuNo)}</td><td><strong style="color:${congNo > 0 ? '#ef4444' : congNo < 0 ? '#0284c7' : '#16a34a'}">${money(congNo)}</strong></td><td>${badge}</td></tr>`;
+          return `<tr data-action="view-customer" data-id="${safeText(item.id)}" class="${highDebt ? 'row-debt-high' : ''}" style="cursor:pointer" ondblclick="openCustomerDrawer('${safeText(item.id)}')"><td class="mono">${safeText(item.id)}</td><td style="${highDebt ? 'color:#dc2626;font-weight:700' : ''}">${safeText(item.ten_kh)}</td><td>${safeText(item.dien_thoai || "")}</td><td>${safeText(item.email || "")}</td><td>${safeText(item.nv_quan_ly || "")}</td><td style="font-weight:600">${safeText(item.kenh || "")}</td><td style="font-weight:600; text-align:center">${safeText(item.tt || "")}</td><td>${money(banHang)}</td><td>${money(thuNo)}</td><td><strong style="color:${congNo > 0 ? '#ef4444' : congNo < 0 ? '#0284c7' : '#16a34a'}">${money(congNo)}</strong></td><td>${badge}</td></tr>`;
         }).join("");
       };
 
@@ -1261,7 +1273,7 @@
 
         const renderRows = rows.slice(0, 150); // Mượt mà cho 10.000 data
         tbody.innerHTML = renderRows.map(item => {
-          return `<tr data-action="view-product" data-id="${safeText(item.id)}" style="cursor: pointer;" onclick="openProductDrawer('${safeText(item.id)}')">
+          return `<tr data-action="view-product" data-id="${safeText(item.id)}" style="cursor: pointer;" ondblclick="openProductDrawer('${safeText(item.id)}')">
              <td class="mono">${highlight(item.id, qRaw)}</td>
              <td style="font-weight:600; color:var(--text-main)">${highlight(item.ten_sp, qRaw)}</td>
              <td>${highlight(item.model, qRaw)}</td>
@@ -1497,7 +1509,7 @@
           return true;
         });
 
-        tbody.innerHTML = rows.length ? rows.map((item) => `<tr data-action="view-debt" data-id="${safeText(item.id)}" style="cursor: pointer;" onclick="viewDebtDrawer('${safeText(item.id)}')"><td class="mono">${safeText(item.id)}</td><td>${safeText(formatDateVi(item.ngay))}</td><td>${safeText(getCustomerName(item.id_khach_hang))}</td><td>${safeText(item.id_dh || "")}</td><td><span class="badge ${item.thu_chi === 'thu' ? 'badge-thu' : 'badge-chi'}">${item.thu_chi === 'thu' ? 'Thu' : 'Chi'}</span></td><td><span style="color:${item.thu_chi === 'thu' ? '#16a34a' : '#ef4444'}">${item.thu_chi === 'thu' ? '-' : '+'}${money(item.so_tien)}</span></td><td><strong style="color:var(--brand)">${money(vMap[item.id])}</strong></td></tr>`).join("") : '<tr><td colspan="7" class="empty">Không tìm thấy dữ liệu phù hợp.</td></tr>';
+        tbody.innerHTML = rows.length ? rows.map((item) => `<tr data-action="view-debt" data-id="${safeText(item.id)}" style="cursor: pointer;" ondblclick="viewDebtDrawer('${safeText(item.id)}')"><td class="mono">${safeText(item.id)}</td><td>${safeText(formatDateVi(item.ngay))}</td><td>${safeText(getCustomerName(item.id_khach_hang))}</td><td>${safeText(item.id_dh || "")}</td><td><span class="badge ${item.thu_chi === 'thu' ? 'badge-thu' : 'badge-chi'}">${item.thu_chi === 'thu' ? 'Thu' : 'Chi'}</span></td><td><span style="color:${item.thu_chi === 'thu' ? '#16a34a' : '#ef4444'}">${item.thu_chi === 'thu' ? '-' : '+'}${money(item.so_tien)}</span></td><td><strong style="color:var(--brand)">${money(vMap[item.id])}</strong></td></tr>`).join("") : '<tr><td colspan="7" class="empty">Không tìm thấy dữ liệu phù hợp.</td></tr>';
       };
 
       const custInput = document.getElementById("debtFilterCustomerDisp");
@@ -1839,7 +1851,7 @@
                tbody tr[data-action="view-order-detail"]:hover{background:var(--brand-soft)}
             </style>
             <table>
-              <thead><tr><th>ID</th><th>ID đơn hàng</th><th>Ngày</th><th>Nhà phân phối</th><th>ID nhân viên</th><th>ID sản phẩm</th><th>Loại SP</th><th style="text-align:right">Đơn giá</th><th style="text-align:center">Số lượng</th><th style="text-align:right">Thành tiền</th></tr></thead>
+              <thead><tr><th>ID đơn hàng</th><th>Ngày</th><th>Nhà phân phối</th><th>ID nhân viên</th><th>ID sản phẩm</th><th>Loại SP</th><th style="text-align:right">Đơn giá</th><th style="text-align:center">Số lượng</th><th style="text-align:right">Thành tiền</th></tr></thead>
               <tbody id="odTableBody"></tbody>
               <tfoot id="odTableFoot" style="font-weight:bold; background:#f8fafc"></tfoot>
             </table>
@@ -1861,6 +1873,10 @@
         const formatProductLabel = (id) => {
           const productName = spMap[id] || "";
           return productName && productName !== id ? `${id} - ${productName}` : id;
+        };
+        const formatCustomerLabel = (id) => {
+          const customerName = khMap[id] || "";
+          return customerName && customerName !== id ? `${id} - ${customerName}` : id;
         };
 
         const q = (document.getElementById("odSearch").value || "").toLowerCase();
@@ -1886,7 +1902,7 @@
         });
 
         if (!rows.length) {
-          tbody.innerHTML = '<tr><td colspan="10" class="empty">Không tìm thấy chi tiết đơn hàng.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="empty">Không tìm thấy chi tiết đơn hàng.</td></tr>';
           tfoot.innerHTML = '';
           return;
         }
@@ -1894,10 +1910,9 @@
         const renderRows = rows.slice(0, 150);
         tbody.innerHTML = renderRows.map(item => `
           <tr data-action="view-order-detail" data-id="${safeText(item.id)}" style="cursor: pointer;" ondblclick="openOrderDetailViewDrawer('${safeText(item.id_dh)}')">
-             <td class="mono">${safeText(item.id)}</td>
              <td class="mono"><span class="badge" style="background:#e0f2fe; color:#0284c7">${safeText(item.id_dh)}</span></td>
              <td>${safeText(formatDateVi(item.ngay))}</td>
-             <td>${safeText(khMap[item.npp] || item.npp)}</td>
+             <td>${safeText(formatCustomerLabel(item.npp))}</td>
              <td>${safeText(nvMap[item.id_nv] || item.id_nv)}</td>
              <td style="font-weight:600; color:var(--text)">${safeText(formatProductLabel(item.id_sp))}</td>
              <td><span class="badge" style="background:#f1f5f9; color:#475569">${safeText(item.sp_chinh_thuong || "-")}</span></td>
@@ -1906,9 +1921,9 @@
              <td style="text-align:right"><strong style="color:var(--brand)">${money(item.thanh_tien)}</strong></td>
           </tr>`).join("");
 
-        if (rows.length > 150) tbody.innerHTML += `<tr><td colspan="10" style="text-align:center; padding:12px; color:var(--muted); font-size:13px; background:#f9fafb;">... và <strong>${rows.length - 150}</strong> dòng khác (Hãy lọc chi tiết hơn)</td></tr>`;
+        if (rows.length > 150) tbody.innerHTML += `<tr><td colspan="9" style="text-align:center; padding:12px; color:var(--muted); font-size:13px; background:#f9fafb;">... và <strong>${rows.length - 150}</strong> dòng khác (Hãy lọc chi tiết hơn)</td></tr>`;
 
-        tfoot.innerHTML = `<tr><td colspan="8" style="text-align:right"><strong>TỔNG CỘNG:</strong></td><td style="text-align:center; color:var(--brand)">${sumQty}</td><td style="text-align:right; color:var(--brand)">${money(sumTotal)}</td></tr>`;
+        tfoot.innerHTML = `<tr><td colspan="7" style="text-align:right"><strong>TỔNG CỘNG:</strong></td><td style="text-align:center; color:var(--brand)">${sumQty}</td><td style="text-align:right; color:var(--brand)">${money(sumTotal)}</td></tr>`;
       };
 
       const setupDropdownObj = (inputEl, menuEl, clearEl, sourceList, boxId) => {
@@ -2096,6 +2111,10 @@
         const productName = spMap[id] || "";
         return productName && productName !== id ? `${id} - ${productName}` : id;
       };
+      const formatCustomerLabel = (id) => {
+        const customerName = khMap[id] || "";
+        return customerName && customerName !== id ? `${id} - ${customerName}` : id;
+      };
       const totalQty = details.reduce((sum, item) => sum + Number(item.slg || 0), 0);
       const totalMoney = details.reduce((sum, item) => sum + Number(item.thanh_tien || 0), 0);
 
@@ -2104,7 +2123,7 @@
           <div style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:12px;">
             <div class="field"><label>ID đơn hàng</label><input value="${safeText(orderId)}" readonly style="background:var(--brand-soft); color:var(--brand); font-weight:700"/></div>
             <div class="field"><label>Ngày</label><input value="${safeText(formatDateVi(first.ngay))}" readonly style="background:var(--soft)"/></div>
-            <div class="field"><label>Nhà phân phối</label><input value="${safeText(khMap[first.npp] || first.npp || "")}" readonly style="background:var(--soft)"/></div>
+            <div class="field"><label>Nhà phân phối</label><input value="${safeText(formatCustomerLabel(first.npp || ""))}" readonly style="background:var(--soft)"/></div>
             <div class="field"><label>ID nhân viên</label><input value="${safeText(first.id_nv || "")}" readonly style="background:var(--soft)"/></div>
           </div>
 
@@ -2965,17 +2984,12 @@
       if (activeTab === "orders") activeTab = "sales_dashboard";
       if (isAdminUser()) fullAppState = normalizeState(clone(appState));
       renderNav();
-      renderDashboard();
-      renderSalesDashboard();
-      renderCustomers();
-      renderProducts();
-      renderOrderDetails();
-      renderDebts();
-      renderKpi();
-      renderThuong();
-      renderTiTrong();
-      renderSync();
-      switchTab(activeTab);
+      renderActiveSection(activeTab);
+      document.querySelectorAll(".section").forEach((section) => section.classList.toggle("active", section.id === activeTab));
+      const meta = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+      el.pageTitle.textContent = meta.label;
+      el.pageSubtitle.textContent = meta.subtitle;
+      if (typeof window.updateSalesDashSticky === "function") requestAnimationFrame(() => window.updateSalesDashSticky());
       cacheState();
       el.sheetSummary.textContent = `Đã tải lúc: ${syncMeta.lastLoadedAt || "chưa có"} | Sheets: ${Object.keys(CONFIG.sheets).join(", ")}`;
     }
@@ -3039,12 +3053,6 @@
       showToast("Đã đăng xuất.");
     }
 
-    function updateClock() {
-      const now = new Date();
-      el.clockChip.textContent = now.toLocaleTimeString("vi-VN");
-      el.dateChip.textContent = now.toLocaleDateString("vi-VN", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
-    }
-
     function bindStaticEvents() {
       el.loginForm.addEventListener("submit", handleLoginSubmit);
       el.logoutBtn.addEventListener("click", handleLogout);
@@ -3058,8 +3066,6 @@
 
     async function bootstrap() {
       bindStaticEvents();
-      updateClock();
-      setInterval(updateClock, 1000);
       loadCachedState();
       renderAll();
       try {
