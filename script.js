@@ -1626,12 +1626,18 @@
             let skippedCount = 0;
             const existingDebtIds = new Set(appState.CONG_NO.map(c => String(c.id || "").trim().toLowerCase()).filter(Boolean));
             const newDebtRows = [];
+            const customerStaffMap = {};
+            appState.KHACH_HANG.forEach(customer => {
+              const customerId = String(customer.id || "").trim();
+              if (customerId) customerStaffMap[customerId] = String(customer.nv_quan_ly || "").trim();
+            });
 
             rows.forEach((row) => {
               const id = String(getCell(row, "id") || "").trim() || randomId("CN");
               const idKh = String(getCell(row, "id_khach_hang") || "").trim();
               const thuChi = normalizeDebtType(getCell(row, "thu_chi"));
               const soTien = parseLooseNumber(getCell(row, "so_tien"));
+              const idNv = customerStaffMap[idKh] || "";
 
               if (!idKh || !thuChi || soTien <= 0) {
                 skippedCount++;
@@ -1650,7 +1656,7 @@
                 thu_chi: thuChi,
                 so_tien: soTien,
                 cong_no: "",
-                id_nv: ""
+                id_nv: idNv
               };
               appState.CONG_NO.push(record);
               newDebtRows.push(record);
@@ -1739,6 +1745,11 @@
       const hiddenId = document.getElementById("debtCustomerId");
       const menu = document.getElementById("debtCustomerMenu");
       const allCustomers = appState.KHACH_HANG;
+      const customerStaffMap = {};
+      allCustomers.forEach(customer => {
+        const customerId = String(customer.id || "").trim();
+        if (customerId) customerStaffMap[customerId] = String(customer.nv_quan_ly || "").trim();
+      });
 
       const renderCustList = (query) => {
         const q = query.toLowerCase();
@@ -1763,7 +1774,8 @@
         const data = Object.fromEntries(new FormData(event.target).entries());
         if (!data.id_khach_hang) return alert("Vui lòng chọn chính xác khách hàng từ danh sách tìm kiếm gợi ý.");
 
-        const record = { id: String(data.id).trim(), ngay: formatDateVi(String(data.ngay)), id_khach_hang: String(data.id_khach_hang).trim(), id_dh: String(data.id_dh || "").trim(), thu_chi: String(data.thu_chi || "chi"), so_tien: Number(data.so_tien || 0), cong_no: Number(item.cong_no || 0), id_nv: String(data.id_nv || "").trim() };
+        const idKhachHang = String(data.id_khach_hang).trim();
+        const record = { id: String(data.id).trim(), ngay: formatDateVi(String(data.ngay)), id_khach_hang: idKhachHang, id_dh: String(data.id_dh || "").trim(), thu_chi: String(data.thu_chi || "chi"), so_tien: Number(data.so_tien || 0), cong_no: Number(item.cong_no || 0), id_nv: customerStaffMap[idKhachHang] || "" };
         const index = appState.CONG_NO.findIndex((row) => row.id === record.id);
         const isNew = index < 0;
 
@@ -2015,6 +2027,11 @@
             const newDhCtRows = []; // Dòng mới để append
             const existingProductIds = new Set(appState.DS_SP.map(product => String(product.id || "").trim()).filter(Boolean));
             const newProductRows = [];
+            const customerStaffMap = {};
+            appState.KHACH_HANG.forEach(customer => {
+              const customerId = String(customer.id || "").trim();
+              if (customerId) customerStaffMap[customerId] = String(customer.nv_quan_ly || "").trim();
+            });
 
             for (let i = 3; i < sheetData.length; i++) {
               const row = sheetData[i];
@@ -2031,6 +2048,7 @@
               }
 
               const npp = String(row[7] || "").trim();
+              const id_nv = customerStaffMap[npp] || "";
               const id_sp = String(row[9] || "").trim();
               const ten_sp = String(row[10] || "").trim();
               if (!id_sp) continue;
@@ -2057,7 +2075,7 @@
                 id_dh: id_dh,
                 ngay: ngay_str,
                 npp: npp,
-                id_nv: null, // Không ghi đè để bảo toàn công thức mảng trên sheet
+                id_nv: id_nv,
                 id_sp: id_sp,
                 don_gia: don_gia,
                 slg: slg,
