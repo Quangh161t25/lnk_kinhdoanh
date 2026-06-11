@@ -2460,6 +2460,32 @@
         return { thang, nvId, ds_chinh, ds_thuong, thuong_sp_chinh, thuong_sp_thuong, thuong_doanh_so, ti_le_thu_no, ti_le_thu_no_trc, no_phat_sinh: debt.phat_sinh, no_da_thu: debt.da_thu, tong_tien_thuong };
       });
 
+      const specialNvName = "Lê Quang Tuyến";
+      const monthlyRevenueMap = {};
+      Object.values(salesMap).forEach(entry => {
+        monthlyRevenueMap[entry.thang] = (monthlyRevenueMap[entry.thang] || 0) + Number(entry.ds_thuong || 0);
+      });
+      Object.entries(monthlyRevenueMap).forEach(([thang, monthlyRevenue]) => {
+        if (monthlyRevenue <= 0) return;
+        const specialRow = {
+          thang,
+          nvId: specialNvName,
+          ds_chinh: 0,
+          ds_thuong: monthlyRevenue,
+          thuong_sp_chinh: 0,
+          thuong_sp_thuong: 0,
+          thuong_doanh_so: 0,
+          ti_le_thu_no: 0,
+          ti_le_thu_no_trc: 0,
+          no_phat_sinh: 0,
+          no_da_thu: 0,
+          tong_tien_thuong: Math.round(monthlyRevenue * 0.002)
+        };
+        const existingIndex = rows.findIndex(row => row.thang === thang && String(row.nvId || "").trim().toLowerCase() === specialNvName.toLowerCase());
+        if (existingIndex >= 0) rows[existingIndex] = specialRow;
+        else rows.push(specialRow);
+      });
+
       // --- Tính TỔNG THỰC NHẬN (Secondary pass cho các NV đặc biệt) ---
       rows.forEach(r => {
         const nvIdLower = String(r.nvId || "").trim().toLowerCase();
