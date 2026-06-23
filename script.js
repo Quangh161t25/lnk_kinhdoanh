@@ -1657,38 +1657,20 @@ function renderDebts() {
         if (typeof XLSX === "undefined") throw new Error("Thư viện XLSX chưa tải xong, thử lại.");
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames.includes("Báo cáo") ? "Báo cáo" : workbook.SheetNames[0];
-        const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
-        const normalizeHeader = (value) => removeDiacritics(String(value || "")).toLowerCase().replace(/[^a-z0-9_]/g, "");
-        const normalizeDebtType = (value) => {
-          const text = normalizeBonusKey(value);
-          if (["thu", "phieuthu", "tien thu", "tienthu", "giamno"].includes(text)) return "thu";
-          if (["chi", "phieuchi", "tien chi", "tienchi", "phatsinh", "tangno"].includes(text)) return "chi";
-          return "";
-        };
+        const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
         const parseExcelDateValue = (value) => {
           if (value instanceof Date) return `${value.getFullYear()}-${(value.getMonth() + 1).toString().padStart(2, "0")}-${value.getDate().toString().padStart(2, "0")}`;
           if (typeof value === "number" && value > 30000) {
             const date = new Date(Math.round((value - 25569) * 86400 * 1000));
             return `${date.getUTCFullYear()}-${(date.getUTCMonth() + 1).toString().padStart(2, "0")}-${date.getUTCDate().toString().padStart(2, "0")}`;
           }
-          return String(value || "").trim();
+          let str = String(value || "").trim();
+          if (str.includes("/")) {
+            const parts = str.split("/");
+            if (parts.length === 3) str = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+          }
+          return str;
         };
-        const getCell = (row, field) => {
-          const target = normalizeHeader(field);
-          const key = Object.keys(row).find((name) => normalizeHeader(name) === target);
-          return key ? row[key] : "";
-        };
-
-        const requiredHeaders = ["id", "ngay", "id_khach_hang", "id_dh", "thu_chi", "so_tien"];
-        const firstRow = rows[0] || {};
-        const availableHeaders = Object.keys(firstRow).map(normalizeHeader);
-        const missingHeaders = requiredHeaders.filter((header) => !availableHeaders.includes(normalizeHeader(header)));
-        if (missingHeaders.length) {
-          alert(`File Excel thiếu cột: ${missingHeaders.join(", ")}\nCần đúng các cột: id, ngay, id_khach_hang, id_dh, thu_chi, so_tien.`);
-          el.toast.classList.remove("show");
-          e.target.value = "";
-          return;
-        }
 
         let newDebtCount = 0;
         let skippedCount = 0;
@@ -1700,37 +1682,54 @@ function renderDebts() {
           if (customerId) customerStaffMap[customerId] = String(customer.nv_quan_ly || "").trim();
         });
 
-        rows.forEach((row) => {
-          const id = String(getCell(row, "id") || "").trim() || randomId("CN");
-          const idKh = String(getCell(row, "id_khach_hang") || "").trim();
-          const thuChi = normalizeDebtType(getCell(row, "thu_chi"));
-          const soTien = parseLooseNumber(getCell(row, "so_tien"));
+        for (let i = 4; i < sheetData.length; i++) {
+          const row = sheetData[i];
+          if (!row || row.length === 0) continue;
+
+          const idKh = String(row[0] || "").trim();
+          if (!idKh || idKh.toLowerCase() === "mã khách hàng" || idKh.toLowerCase() === "tổng cộng") continue;
+
+          const ngayVal = parseExcelDateValue(row[1]) || todayInput();
           const idNv = customerStaffMap[idKh] || "";
+          
+          const psNoRaw = row[6];
+          const psNo = typeof psNoRaw === "number" ? psNoRaw : Number(String(psNoRaw || "0").replace(/[^0-9.-]+/g, ""));
+          
+          const psCoRaw = row[7];
+          const psCo = typeof psCoRaw === "number" ? psCoRaw : Number(String(psCoRaw || "0").replace(/[^0-9.-]+/g, ""));
 
-          if (!idKh || !thuChi || soTien <= 0) {
-            skippedCount++;
-            return;
-          }
-          if (existingDebtIds.has(id.toLowerCase())) {
-            skippedCount++;
-            return;
-          }
-
-          const record = {
-            id,
-            ngay: parseExcelDateValue(getCell(row, "ngay")) || todayInput(),
-            id_khach_hang: idKh,
-            id_dh: String(getCell(row, "id_dh") || "").trim(),
-            thu_chi: thuChi,
-            so_tien: soTien,
-            cong_no: "",
-            id_nv: idNv
+          const addRecord = (thuChi, soTien) => {
+            const id = randomId("CN");
+            const record = {
+              id,
+              ngay: ngayVal,
+              id_khach_hang: idKh,
+              id_dh: "",
+              thu_chi: thuChi,
+              so_tien: soTien,
+              cong_no: "",
+              id_nv: idNv
+            };
+            appState.CONG_NO.push(record);
+            newDebtRows.push(record);
+            existingDebtIds.add(id.toLowerCase());
+            newDebtCount++;
           };
-          appState.CONG_NO.push(record);
-          newDebtRows.push(record);
-          existingDebtIds.add(id.toLowerCase());
-          newDebtCount++;
-        });
+
+          let hasData = false;
+          if (psNo > 0) {
+            addRecord("chi", psNo);
+            hasData = true;
+          }
+          if (psCo > 0) {
+            addRecord("thu", psCo);
+            hasData = true;
+          }
+
+          if (!hasData) {
+            skippedCount++;
+          }
+        }
 
         if (newDebtCount > 0) {
           recalcState(appState);
