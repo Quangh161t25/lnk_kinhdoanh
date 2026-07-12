@@ -9,7 +9,7 @@ const CONFIG = {
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
   sheets: {
     KHACH_HANG: ["id", "ten_kh", "dien_thoai", "email", "dia_chi", "ngay_cap_nhat", "nv_quan_ly", "kenh", "tt"],
-    DS_SP: ["id", "ten_sp", "model", "ncc", "gia_ban"],
+    DS_SP: ["id", "ten_sp", "model", "ncc", "gia_ban", "sp_chinh_thuong"],
     DH_CT: ["id", "id_dh", "ngay", "npp", "id_nv", "id_sp", "don_gia", "slg", "thanh_tien", "ncc", "sp_chinh_thuong"],
     KPI: ["id", "thang", "id_nv", "ds_chinh", "ds_thuong", "tien_thuong_ds_chinh", "tien_thuong_ds_thuong", "tien_thuong_ds", "ti_le_thu_con_no", "tong_tien_thuong", "tong_tien_thuong_thuc"],
     CONG_NO: ["id", "ngay", "id_khach_hang", "id_dh", "thu_chi", "so_tien", "cong_no", "id_nv"],
@@ -23,7 +23,6 @@ const NAV_ITEMS = [
   { id: "products", label: "Danh sách Sản phẩm", subtitle: "KINH DOANH", icon: "box", color: "#8f53ff" },
   { id: "customers", label: "Khách hàng", subtitle: "KINH DOANH", icon: "users", color: "#00b894" },
   { id: "debts", label: "Công nợ", subtitle: "KINH DOANH", icon: "coin", color: "#ff4d6d" },
-  { id: "kpi", label: "KPI", subtitle: "KINH DOANH", icon: "chart", color: "#f59e0b" },
   { id: "thuong", label: "Thưởng Nhân Viên", subtitle: "KINH DOANH", icon: "gift", color: "#e11d48" },
   { id: "ti_trong", label: "TỈ TRỌNG", subtitle: "KINH DOANH", icon: "chart", color: "#6366f1" }
 ];
@@ -286,6 +285,7 @@ const normalizeProductType = (value) => {
   const normalized = normalizeBonusKey(value);
   if (normalized === "chinh") return "chinh";
   if (normalized === "thuong") return "thuong";
+  if (normalized === "r1") return "r1";
   return "";
 };
 const normalizeMonthKey = (value) => {
@@ -408,7 +408,6 @@ function renderActiveSection(tabId = activeTab) {
     products: renderProducts,
     order_details: renderOrderDetails,
     debts: renderDebts,
-    kpi: renderKpi,
     thuong: renderThuong,
     ti_trong: renderTiTrong,
     sync: renderSync
@@ -613,14 +612,7 @@ function renderSalesDashboard() {
              <small style="color:var(--muted);font-weight:700;font-size:10px">TỔNG DOANH SỐ</small>
              <strong id="dTotalS" style="display:block;font-size:16px;color:#2d5bff;margin-top:4px">-</strong>
           </div>
-          <div class="card" style="padding:12px 14px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.04);">
-             <small style="color:#2563eb;font-weight:700;font-size:10px">SẢN PHẨM CHÍNH</small>
-             <strong id="dTotalSpChinh" style="display:block;font-size:16px;color:#2563eb;margin-top:4px">-</strong>
-          </div>
-          <div class="card" style="padding:12px 14px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.04);">
-             <small style="color:#7c3aed;font-weight:700;font-size:10px">SẢN PHẨM THƯỜNG</small>
-             <strong id="dTotalSpThuong" style="display:block;font-size:16px;color:#7c3aed;margin-top:4px">-</strong>
-          </div>
+          <div id="dynamicSpTypeCards" style="display:contents;"></div>
           <div class="card" style="padding:12px 14px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.04);">
              <small style="color:var(--muted);font-weight:700;font-size:10px">TỔNG NỢ PHÁT SINH</small>
              <strong id="dTotalChi" style="display:block;font-size:16px;color:#ef4444;margin-top:4px">-</strong>
@@ -646,7 +638,7 @@ function renderSalesDashboard() {
 
         <div style="display:grid; gap:20px; margin-bottom:40px;">
           <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Doanh số theo tháng</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Tháng</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Đã thu</th><th style="text-align:right">Nợ ròng tháng</th><th style="text-align:right">Dư nợ cuối tháng</th></tr></thead><tbody id="dTMonth"></tbody></table></div></div>
-          <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Nhân viên (Mã NV)</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Mã NV</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Nợ đã thu</th><th style="text-align:right">Nợ ròng</th><th style="text-align:right">Dư nợ cuối</th><th style="text-align:right">Tỉ lệ thu (tháng này)</th><th style="text-align:right">Tỉ lệ thu (tháng trc)</th></tr></thead><tbody id="dTNv"></tbody></table></div></div>
+          <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Nhân viên (Mã NV)</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Mã NV</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Nợ đã thu</th><th style="text-align:right">Nợ ròng</th><th style="text-align:right">Dư nợ cuối</th><th style="text-align:right">Tỉ lệ thu (tháng này)</th></tr></thead><tbody id="dTNv"></tbody></table></div></div>
           <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Doanh số theo Khách hàng</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Mã KH</th><th>Tên KH</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Đã thu</th><th style="text-align:right">Nợ ròng tháng</th><th style="text-align:right">Dư nợ cuối tháng</th></tr></thead><tbody id="dTKh"></tbody></table></div><div class="pagination" id="dTKhPagination"></div></div>
         </div>
       `;
@@ -729,10 +721,31 @@ function renderSalesDashboard() {
       if (fKs.length > 0 && !fKs.includes(item.npp)) return false;
       return true;
     });
-    const spChinhTotal = filteredDetails.reduce((sum, item) => (normalizeProductType(item.sp_chinh_thuong) === "chinh" ? sum + Number(item.thanh_tien || 0) : sum), 0);
-    const spThuongTotal = filteredDetails.reduce((sum, item) => (normalizeProductType(item.sp_chinh_thuong) === "thuong" ? sum + Number(item.thanh_tien || 0) : sum), 0);
-    document.getElementById("dTotalSpChinh").textContent = money(spChinhTotal);
-    document.getElementById("dTotalSpThuong").textContent = money(spThuongTotal);
+
+    const spTypeTotals = {};
+    filteredDetails.forEach(item => {
+      const t = String(item.sp_chinh_thuong || "").trim().toUpperCase();
+      if (!t) return; // Bỏ qua những mục không có phân loại (CHƯA PHÂN LOẠI)
+      spTypeTotals[t] = (spTypeTotals[t] || 0) + Number(item.thanh_tien || 0);
+    });
+
+    const dynamicContainer = document.getElementById("dynamicSpTypeCards");
+    if (dynamicContainer) {
+      const colors = ["#2563eb", "#7c3aed", "#ea580c", "#16a34a", "#db2777", "#0284c7"];
+      let html = "";
+      let colorIdx = 0;
+      for (const [type, total] of Object.entries(spTypeTotals)) {
+        const c = colors[colorIdx % colors.length];
+        html += `
+          <div class="card" style="padding:12px 14px; border:none; box-shadow:0 2px 8px rgba(0,0,0,.04);">
+             <small style="color:${c};font-weight:700;font-size:10px">${safeText(type)}</small>
+             <strong style="display:block;font-size:16px;color:${c};margin-top:4px">${money(total)}</strong>
+          </div>
+        `;
+        colorIdx++;
+      }
+      dynamicContainer.innerHTML = html;
+    }
 
     const getM = (ngay) => {
       if (!ngay) return "N/A";
@@ -905,17 +918,6 @@ function renderSalesDashboard() {
     const buildNvRowHTML = (k, st) => {
       const name = getNvN(k);
       let ratioCM = st.chiCM > 0 ? (st.thuCM / st.chiCM) * 100 : 0;
-      let ratioLM = st.chiLM > 0 ? (st.thuCM / st.chiLM) * 100 : 0;
-      let hideCM = false, hideLM = false;
-
-      const listLastMonth = ["Ngô Tuấn Anh", "Vũ Công Tâm"];
-      const listThisMonth = ["Trần Doãn Sáng", "Đoàn Văn Quang"];
-
-      if (listLastMonth.includes(name) || listLastMonth.includes(k)) {
-        ratioCM = 0; hideCM = true;
-      } else if (listThisMonth.includes(name) || listThisMonth.includes(k)) {
-        ratioLM = 0; hideLM = true;
-      }
 
       return `<tr>
              <td class="mono">${safeText(k)}</td>
@@ -924,13 +926,12 @@ function renderSalesDashboard() {
              <td style="text-align:right;color:#16a34a">${money(st.thu)}</td>
              <td style="text-align:right;color:${(st.chi - st.thu) > 0 ? '#ef4444' : ((st.chi - st.thu) < 0 ? '#16a34a' : 'inherit')}">${money(st.chi - st.thu)}</td>
              <td style="text-align:right;font-weight:bold;color:${st.luyKe > 0 ? '#ef4444' : (st.luyKe < 0 ? '#16a34a' : 'inherit')}">${money(st.luyKe)}</td>
-             <td style="text-align:right;font-weight:600;color:${ratioCM >= 100 ? '#16a34a' : '#f59e0b'}">${hideCM ? '' : ratioCM.toFixed(1) + '%'}</td>
-             <td style="text-align:right;font-weight:600;color:${ratioLM >= 100 ? '#16a34a' : '#f59e0b'}">${hideLM ? '' : ratioLM.toFixed(1) + '%'}</td>
+             <td style="text-align:right;font-weight:600;color:${ratioCM >= 100 ? '#16a34a' : '#f59e0b'}">${ratioCM.toFixed(1) + '%'}</td>
           </tr>`;
     };
 
     const nKs = Object.keys(nvStats).sort(sortStatsNV).filter(k => k !== "N/A" || nvStats[k].s > 0 || nvStats[k].chi > 0 || nvStats[k].thu > 0);
-    document.getElementById("dTNv").innerHTML = nKs.map(k => buildNvRowHTML(k, nvStats[k])).join("") || '<tr class="empty"><td colspan="8">Trống</td></tr>';
+    document.getElementById("dTNv").innerHTML = nKs.map(k => buildNvRowHTML(k, nvStats[k])).join("") || '<tr class="empty"><td colspan="7">Trống</td></tr>';
 
     const kKs = Object.keys(khStats).sort((a, b) => sortStats(khStats, a, b)).filter(k => k !== "N/A" || khStats[k].s > 0 || khStats[k].luyKe !== 0);
     const khTotalRows = kKs.length;
@@ -2130,12 +2131,16 @@ function renderOrderDetails() {
               ten_sp: ten_sp || id_sp,
               model: "",
               ncc: "",
-              gia_ban: don_gia || 0
+              gia_ban: don_gia || 0,
+              sp_chinh_thuong: ""
             };
             appState.DS_SP.push(productRow);
             newProductRows.push(productRow);
             existingProductIds.add(id_sp);
           }
+
+          const dsSpObj = appState.DS_SP.find(x => String(x.id).trim() === id_sp);
+          const spChinhThuong = dsSpObj ? dsSpObj.sp_chinh_thuong : null;
 
           const newRow = {
             id: randomId().toLowerCase() + randomId().toLowerCase().substring(0, 2),
@@ -2148,7 +2153,7 @@ function renderOrderDetails() {
             slg: slg,
             thanh_tien: thanh_tien,
             ncc: null,
-            sp_chinh_thuong: null
+            sp_chinh_thuong: spChinhThuong || null
           };
 
           appState.DH_CT.push(newRow);
@@ -2476,18 +2481,19 @@ function renderThuong() {
 
   // --- Tổng hợp dữ liệu DH_CT theo (thang, id_nv) ---
   const mapKey = (thang, nvId) => `${thang}||${nvId}`;
-  const salesMap = {}; // key => { ds_chinh, ds_thuong }
+  const salesMap = {}; // key => { ds_chinh, ds_thuong, ds_r1 }
   (appState.DH_CT || []).forEach(row => {
     const nvId = (row.id_nv || "").trim();
     if (!nvId) return;
     const thang = parseThangFromDate(row.ngay || "");
     if (!thang) return;
     const key = mapKey(thang, nvId);
-    if (!salesMap[key]) salesMap[key] = { thang, nvId, ds_chinh: 0, ds_thuong: 0 };
+    if (!salesMap[key]) salesMap[key] = { thang, nvId, ds_chinh: 0, ds_thuong: 0, ds_r1: 0 };
     const loaiSp = normalizeProductType(row.sp_chinh_thuong);
     const tt = Number(row.thanh_tien || 0);
     if (loaiSp === "chinh") salesMap[key].ds_chinh += tt;
     else if (loaiSp === "thuong") salesMap[key].ds_thuong += tt;
+    else if (loaiSp === "r1") salesMap[key].ds_r1 += tt;
   });
 
   // --- Tổng hợp công nợ theo (thang, id_nv) ---
@@ -2506,32 +2512,16 @@ function renderThuong() {
 
   // --- Tính bảng thưởng ---
   const rows = Object.values(salesMap).map(entry => {
-    const { thang, nvId, ds_chinh, ds_thuong } = entry;
+    const { thang, nvId, ds_chinh, ds_thuong, ds_r1 } = entry;
     const thuong_sp_chinh = Math.round(lookupBonus("sp_chinh", ds_chinh, nvId, thang));
     const thuong_sp_thuong = Math.round(lookupBonus("sp_thuong", ds_thuong, nvId, thang));
-    const thuong_doanh_so = thuong_sp_chinh + thuong_sp_thuong;
+    const thuong_sp_r1 = Math.round((ds_r1 || 0) * 0.005);
+    const thuong_doanh_so = thuong_sp_chinh + thuong_sp_thuong + thuong_sp_r1;
 
     const debt = debtMap[mapKey(thang, nvId)] || { phat_sinh: 0, da_thu: 0 };
-    const ti_le_thu_no = debt.phat_sinh > 0 ? (debt.da_thu / debt.phat_sinh * 100) : 100;
+    const ti_le_thu_no = debt.phat_sinh > 0 ? (debt.da_thu / debt.phat_sinh * 100) : 0;
 
-    let prevThang = "";
-    if (thang && thang.includes("-")) {
-      let [yyyy, mm] = thang.split("-").map(Number);
-      mm -= 1;
-      if (mm === 0) { mm = 12; yyyy -= 1; }
-      prevThang = `${yyyy}-${String(mm).padStart(2, "0")}`;
-    }
-    const prevDebt = debtMap[mapKey(prevThang, nvId)] || { phat_sinh: 0, da_thu: 0 };
-    // TỈ LỆ THU NỢ THÁNG TRC = Nợ đã thu THÁNG NÀY / Nợ phát sinh THÁNG TRƯỚC
-    const ti_le_thu_no_trc = prevDebt.phat_sinh > 0 ? (debt.da_thu / prevDebt.phat_sinh * 100) : 100;
-
-    let selected_ti_le = ti_le_thu_no; // Mặc định là tháng này
-    const nvIdLower = String(nvId || "").trim().toLowerCase();
-    if (nvIdLower === "ngô tuấn anh" || nvIdLower === "vũ công tâm") {
-      selected_ti_le = ti_le_thu_no_trc;
-    } else if (nvIdLower === "đoàn văn quang" || nvIdLower === "trần doãn sáng") {
-      selected_ti_le = ti_le_thu_no;
-    }
+    let selected_ti_le = ti_le_thu_no; // Bây giờ ai cũng dùng tỉ lệ tháng này
 
     let tong_tien_thuong = 0;
     if (selected_ti_le < 50) {
@@ -2542,7 +2532,7 @@ function renderThuong() {
       tong_tien_thuong = thuong_doanh_so;
     }
 
-    return { thang, nvId, ds_chinh, ds_thuong, thuong_sp_chinh, thuong_sp_thuong, thuong_doanh_so, ti_le_thu_no, ti_le_thu_no_trc, no_phat_sinh: debt.phat_sinh, no_da_thu: debt.da_thu, tong_tien_thuong };
+    return { thang, nvId, ds_chinh, ds_thuong, ds_r1, thuong_sp_chinh, thuong_sp_thuong, thuong_sp_r1, thuong_doanh_so, ti_le_thu_no, no_phat_sinh: debt.phat_sinh, no_da_thu: debt.da_thu, tong_tien_thuong };
   });
 
   const specialNvName = "Lê Quang Tuyến";
@@ -2550,21 +2540,39 @@ function renderThuong() {
   Object.values(salesMap).forEach(entry => {
     monthlyRevenueMap[entry.thang] = (monthlyRevenueMap[entry.thang] || 0) + Number(entry.ds_thuong || 0);
   });
+  
+  const vuGiaSalesByMonth = {};
+  (appState.DH_CT || []).forEach(row => {
+    const loaiSp = normalizeProductType(row.sp_chinh_thuong);
+    if (loaiSp === "thuong") {
+      const npp = String(row.npp || "").toLowerCase();
+      const idKh = String(row.id_khach_hang || "").toLowerCase();
+      if (npp.includes("vũ gia") || idKh.includes("vũ gia")) {
+        const thang = parseThangFromDate(row.ngay || "");
+        if (thang) {
+          vuGiaSalesByMonth[thang] = (vuGiaSalesByMonth[thang] || 0) + Number(row.thanh_tien || 0);
+        }
+      }
+    }
+  });
+
   Object.entries(monthlyRevenueMap).forEach(([thang, monthlyRevenue]) => {
-    if (monthlyRevenue <= 0) return;
+    const finalRevenue = monthlyRevenue - (vuGiaSalesByMonth[thang] || 0);
+    if (finalRevenue <= 0 && monthlyRevenue <= 0) return;
     const specialRow = {
       thang,
       nvId: specialNvName,
       ds_chinh: 0,
-      ds_thuong: monthlyRevenue,
+      ds_thuong: finalRevenue > 0 ? finalRevenue : 0,
+      ds_r1: 0,
       thuong_sp_chinh: 0,
       thuong_sp_thuong: 0,
+      thuong_sp_r1: 0,
       thuong_doanh_so: 0,
       ti_le_thu_no: 0,
-      ti_le_thu_no_trc: 0,
       no_phat_sinh: 0,
       no_da_thu: 0,
-      tong_tien_thuong: Math.round(monthlyRevenue * 0.002)
+      tong_tien_thuong: Math.round((finalRevenue > 0 ? finalRevenue : 0) * 0.002)
     };
     const existingIndex = rows.findIndex(row => row.thang === thang && String(row.nvId || "").trim().toLowerCase() === specialNvName.toLowerCase());
     if (existingIndex >= 0) rows[existingIndex] = specialRow;
@@ -2585,8 +2593,20 @@ function renderThuong() {
     }
   });
 
-  // Sắp xếp: tháng mới nhất trước, sau đó theo id_nv
-  rows.sort((a, b) => b.thang.localeCompare(a.thang) || a.nvId.localeCompare(b.nvId));
+  // Sắp xếp: tháng mới nhất trước, sau đó Lê Quang Tuyến xuống cuối, sau đó theo Doanh số giảm dần, rồi theo id_nv
+  rows.sort((a, b) => {
+    if (a.thang !== b.thang) return b.thang.localeCompare(a.thang);
+    const aIsLqt = String(a.nvId).trim().toLowerCase() === "lê quang tuyến";
+    const bIsLqt = String(b.nvId).trim().toLowerCase() === "lê quang tuyến";
+    if (aIsLqt && !bIsLqt) return 1;
+    if (!aIsLqt && bIsLqt) return -1;
+    
+    const dsA = (a.ds_chinh || 0) + (a.ds_thuong || 0) + (a.ds_r1 || 0);
+    const dsB = (b.ds_chinh || 0) + (b.ds_thuong || 0) + (b.ds_r1 || 0);
+    if (dsB !== dsA) return dsB - dsA;
+    
+    return a.nvId.localeCompare(b.nvId);
+  });
 
   // --- Lọc ---
   const uniqueMonths = [...new Set(rows.map(r => r.thang))].sort().reverse();
@@ -2606,6 +2626,102 @@ function renderThuong() {
   const dkData = (fullAppState.DK_THUONG || appState.DK_THUONG || []);
   const dkLoaiValues = [...new Set(dkData.map(r => JSON.stringify({ loai: r.loai, kieu: r.kieu })))];
   const spLoaiValues = [...new Set((appState.DH_CT || []).map(r => r.sp_chinh_thuong || "(trống)"))];
+
+  // --- Bảng Nhân viên (Mã NV) ---
+  const currentYM = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+  const effectiveMonth = window.thuongFilterMonth || currentYM;
+  const fTPrev = (() => {
+    if (!effectiveMonth) return null;
+    let parts = effectiveMonth.split("-");
+    if(parts.length < 2) return null;
+    let y = Number(parts[0]), m = Number(parts[1]);
+    m -= 1;
+    if (m === 0) { m = 12; y -= 1; }
+    return `${y}-${String(m).padStart(2, "0")}`;
+  })();
+
+  const getM = (ngay) => {
+    if (!ngay) return "N/A";
+    if (ngay.includes("-")) return ngay.split("-").slice(0, 2).reverse().join("/");
+    if (ngay.includes("/") && ngay.split("/").length >= 3) return ngay.split("/")[1].padStart(2, "0") + "/" + ngay.split("/")[2];
+    return "N/A";
+  };
+
+  const nvStats = {};
+  const initNvStats = (id) => {
+    if (!nvStats[id]) nvStats[id] = { s: 0, chi: 0, thu: 0, chiCM: 0, thuCM: 0, chiLM: 0, luyKe: 0 };
+  };
+
+  (appState.DH_CT || []).forEach(d => {
+    const m = d.ngay ? (d.ngay.includes("-") ? d.ngay.slice(0, 7) : (d.ngay.split("/").length >= 3 ? d.ngay.split("/")[2] + "-" + d.ngay.split("/")[1].padStart(2, "0") : "")) : "";
+    let isBeforeOrInFt = true;
+    let isInFt = true;
+    if (window.thuongFilterMonth) {
+      if (m > effectiveMonth) { isBeforeOrInFt = false; isInFt = false; }
+      else if (m < effectiveMonth) { isInFt = false; }
+    }
+    if (isBeforeOrInFt && isInFt) {
+      const n = String(d.id_nv || "N/A").trim();
+      if (window.thuongFilterNv && n !== window.thuongFilterNv) return;
+      initNvStats(n);
+      nvStats[n].s += Number(d.thanh_tien || 0);
+    }
+  });
+
+  (appState.CONG_NO || []).forEach(c => {
+    const cym = c.ngay ? (c.ngay.includes("-") ? c.ngay.slice(0, 7) : (c.ngay.split("/").length >= 3 ? c.ngay.split("/")[2] + "-" + c.ngay.split("/")[1].padStart(2, "0") : "")) : "";
+    const isChi = c.thu_chi === "chi";
+    const isThu = c.thu_chi === "thu";
+    const soTien = Number(c.so_tien || 0);
+    const nId = String(c.id_nv || "N/A").trim();
+    if (window.thuongFilterNv && nId !== window.thuongFilterNv) return;
+    initNvStats(nId);
+
+    if (fTPrev && cym === fTPrev && isChi) nvStats[nId].chiLM += soTien;
+    if (cym === effectiveMonth && isChi) nvStats[nId].chiCM += soTien;
+    if (cym === effectiveMonth && isThu) nvStats[nId].thuCM += soTien;
+
+    let isBeforeOrInFt = true;
+    let isInFt = true;
+    if (window.thuongFilterMonth) {
+      if (cym > effectiveMonth) { isBeforeOrInFt = false; isInFt = false; }
+      else if (cym < effectiveMonth) { isInFt = false; }
+    }
+
+    if (isBeforeOrInFt) {
+      let delta = 0;
+      if (isChi) delta += soTien;
+      if (isThu) delta -= soTien;
+      nvStats[nId].luyKe += delta;
+
+      if (isInFt) {
+        if (isChi) nvStats[nId].chi += soTien;
+        if (isThu) nvStats[nId].thu += soTien;
+      }
+    }
+  });
+
+  const sortStatsNV = (a, b) => {
+    const sa = nvStats[a].s || 0; const sb = nvStats[b].s || 0;
+    if (sb !== sa) return sb - sa;
+    return (nvStats[b].luyKe || 0) - (nvStats[a].luyKe || 0);
+  };
+
+  let nKs = Object.keys(nvStats).sort(sortStatsNV).filter(k => k !== "N/A" || nvStats[k].s > 0 || nvStats[k].chi > 0 || nvStats[k].thu > 0);
+
+  const nvTableHTML = nKs.length ? nKs.map(k => {
+    const st = nvStats[k];
+    let ratioCM = st.chiCM > 0 ? (st.thuCM / st.chiCM) * 100 : 0;
+    return `<tr>
+          <td class="mono">${safeText(k)}</td>
+          <td style="text-align:right;color:var(--text-main);font-weight:600">${money(st.s)}</td>
+          <td style="text-align:right;color:#ef4444">${money(st.chi)}</td>
+          <td style="text-align:right;color:#16a34a">${money(st.thu)}</td>
+          <td style="text-align:right;color:${(st.chi - st.thu) > 0 ? '#ef4444' : ((st.chi - st.thu) < 0 ? '#16a34a' : 'inherit')}">${money(st.chi - st.thu)}</td>
+          <td style="text-align:right;font-weight:bold;color:${st.luyKe > 0 ? '#ef4444' : (st.luyKe < 0 ? '#16a34a' : 'inherit')}">${money(st.luyKe)}</td>
+          <td style="text-align:right;font-weight:600;color:${ratioCM >= 100 ? '#16a34a' : '#f59e0b'}">${ratioCM.toFixed(1) + '%'}</td>
+        </tr>`;
+  }).join("") : '<tr><td colspan="7" class="empty">Trống</td></tr>';
 
   // --- Render HTML ---
   container.innerHTML = `
@@ -2637,21 +2753,6 @@ function renderThuong() {
           </div>
 
           <div class="panel" style="padding-top:16px;">
-            ${canManageData() ? `
-            <div style="margin-bottom:12px;padding:12px 14px;background:#fef3c7;border-radius:10px;border:1px solid #fde68a;font-size:12px;color:#92400e;line-height:1.6;">
-              <div style="margin-bottom:6px;">
-                <strong>Quy tắc thưởng theo tỉ lệ thu nợ:</strong><br/>
-                ❌ <strong>&lt;50%</strong> → Không thưởng | 
-                ⚠️ <strong>50–89%</strong> → Thưởng × tỉ lệ thu nợ | 
-                ✅ <strong>≥90%</strong> → Hưởng 100% thưởng
-              </div>
-              <div style="border-top:1px dashed rgba(146, 64, 14, 0.2); padding-top:6px;">
-                <strong>Ghi chú áp dụng Tỉ lệ:</strong><br/>
-                • <strong>Đoàn Văn Quang, Trần Doãn Sáng:</strong> Dùng TỈ LỆ THÁNG NÀY (Thu tháng này / Phát sinh tháng này).<br/>
-                • <strong>Ngô Tuấn Anh, Vũ Công Tâm:</strong> Dùng TỈ LỆ THÁNG TRC (Thu tháng này / Phát sinh tháng trước).<br/>
-                <span style="font-style:italic; opacity:0.8;">* Ngô Tuấn Anh chia 50% tiền thưởng cho Vũ Công Tâm. Cột TỔNG THỰC NHẬN thể hiện số tiền cuối cùng.</span>
-              </div>
-            </div>` : ""}
             <div class="table-wrap" style="max-height:calc(100vh - 400px);overflow:auto;">
               <table style="min-width:1200px;border-collapse:separate;border-spacing:0;">
                 <thead style="position:sticky;top:0;z-index:10;background:#f8fafc;box-shadow:0 1px 0 var(--line);">
@@ -2660,10 +2761,11 @@ function renderThuong() {
                     <th style="width:180px;">ID NV</th>
                     <th style="text-align:right;">DS SP CHÍNH</th>
                     <th style="text-align:right;">DS SP THƯỜNG</th>
+                    <th style="text-align:right;">DS SP R1</th>
                     <th style="text-align:right;">THƯỞNG SP CHÍNH</th>
                     <th style="text-align:right;">THƯỞNG SP THƯỜNG</th>
+                    <th style="text-align:right;">THƯỞNG SP R1</th>
                     <th style="text-align:right;">THƯỞNG DOANH SỐ</th>
-                    <th style="text-align:right;width:130px;">TỈ LỆ THU NỢ THÁNG TRC</th>
                     <th style="text-align:right;width:130px;">TỈ LỆ THÁNG NÀY</th>
                     <th style="text-align:right;background:#fff7ed;font-weight:700;">TỔNG TIỀN THƯỞNG</th>
                     <th style="text-align:right;background:#f0fdf4;font-weight:700;">TỔNG THỰC NHẬN</th>
@@ -2677,41 +2779,35 @@ function renderThuong() {
     else if (r.ti_le_thu_no >= 50) { tiLeBadge = "thuong-badge-partial"; tiLeBg = "#fefce8"; }
     else { tiLeBadge = "thuong-badge-none"; tiLeBg = "#fff1f2"; }
 
-    const tiLeStrTrc = r.ti_le_thu_no_trc.toFixed(0) + "%";
-    let tiLeBadgeTrc;
-    if (r.ti_le_thu_no_trc >= 90) tiLeBadgeTrc = "thuong-badge-full";
-    else if (r.ti_le_thu_no_trc >= 50) tiLeBadgeTrc = "thuong-badge-partial";
-    else tiLeBadgeTrc = "thuong-badge-none";
-
     return `
                     <tr>
                       <td style="font-weight:600;">${safeText(r.thang)}</td>
                       <td class="mono" style="font-weight:600;color:var(--brand);">${safeText(r.nvId)}</td>
                       <td style="text-align:right;">${money(r.ds_chinh)}</td>
                       <td style="text-align:right;">${money(r.ds_thuong)}</td>
+                      <td style="text-align:right;color:#0ea5e9;">${money(r.ds_r1 || 0)}</td>
                       <td style="text-align:right;color:#2563eb;">${money(r.thuong_sp_chinh)}</td>
                       <td style="text-align:right;color:#7c3aed;">${money(r.thuong_sp_thuong)}</td>
+                      <td style="text-align:right;color:#0ea5e9;">${money(r.thuong_sp_r1 || 0)}</td>
                       <td style="text-align:right;font-weight:700;">${money(r.thuong_doanh_so)}</td>
-                      <td style="text-align:right;">
-                        <span class="badge ${tiLeBadgeTrc}" style="font-size:12px;">${tiLeStrTrc}</span>
-                      </td>
                       <td style="text-align:right;">
                         <span class="badge ${tiLeBadge}" style="font-size:12px;">${tiLeStr}</span>
                       </td>
                       <td style="text-align:right;font-weight:700;background:${tiLeBg};">${money(r.tong_tien_thuong)}</td>
                       <td style="text-align:right;font-weight:800;background:#f0fdf4;color:#16a34a;">${money(r.tong_thuc_nhan)}</td>
                     </tr>`;
-  }).join("") : '<tr><td colspan="11" class="empty">Không có dữ liệu thưởng. Vui lòng kiểm tra dữ liệu DH_CT và DK_THUONG.</td></tr>'}
+  }).join("") : '<tr><td colspan="12" class="empty">Không có dữ liệu thưởng. Vui lòng kiểm tra dữ liệu DH_CT và DK_THUONG.</td></tr>'}
                 </tbody>
                 ${filtered.length ? `<tfoot style="background:#f8fafc;font-weight:700;position:sticky;bottom:0;">
                   <tr>
                     <td colspan="2" style="text-align:right;color:var(--muted);">TỔNG CỘNG:</td>
                     <td style="text-align:right;">${money(filtered.reduce((s, r) => s + r.ds_chinh, 0))}</td>
                     <td style="text-align:right;">${money(filtered.reduce((s, r) => s + r.ds_thuong, 0))}</td>
+                    <td style="text-align:right;color:#0ea5e9;">${money(filtered.reduce((s, r) => s + (r.ds_r1 || 0), 0))}</td>
                     <td style="text-align:right;color:#2563eb;">${money(filtered.reduce((s, r) => s + r.thuong_sp_chinh, 0))}</td>
                     <td style="text-align:right;color:#7c3aed;">${money(filtered.reduce((s, r) => s + r.thuong_sp_thuong, 0))}</td>
+                    <td style="text-align:right;color:#0ea5e9;">${money(filtered.reduce((s, r) => s + (r.thuong_sp_r1 || 0), 0))}</td>
                     <td style="text-align:right;">${money(filtered.reduce((s, r) => s + r.thuong_doanh_so, 0))}</td>
-                    <td></td>
                     <td></td>
                     <td style="text-align:right;color:#e11d48;background:#fff7ed;">${money(totalThuong)}</td>
                     <td style="text-align:right;color:#16a34a;background:#f0fdf4;">${money(totalThucNhan)}</td>
@@ -2724,6 +2820,27 @@ function renderThuong() {
               <span style="font-style:italic;">* Dữ liệu tính từ DH_CT (doanh số) + CONG_NO (thu nợ) + DK_THUONG (điều kiện).</span>
             </div>
           </div>
+          
+          <div class="panel" style="padding:0;overflow:hidden;margin-top:20px;">
+            <h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Nhân viên (Mã NV)</h3>
+            <div class="table-wrap">
+              <table style="min-width:100%">
+                <thead>
+                  <tr>
+                    <th>Mã NV</th>
+                    <th style="text-align:right">Doanh số</th>
+                    <th style="text-align:right">Nợ phát sinh</th>
+                    <th style="text-align:right">Nợ đã thu</th>
+                    <th style="text-align:right">Nợ ròng</th>
+                    <th style="text-align:right">Dư nợ cuối</th>
+                    <th style="text-align:right">Tỉ lệ thu (tháng này)</th>
+                  </tr>
+                </thead>
+                <tbody>${nvTableHTML}</tbody>
+              </table>
+            </div>
+          </div>
+
           <div style="margin:12px 16px 16px;padding:12px 14px;background:#f1f5f9;border-radius:10px;border:1px solid #cbd5e1;font-size:12px;font-family:Consolas,monospace;">
             <strong style="color:#334155;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">🔍 DEBUG – Trạng thái dữ liệu</strong>
             <div style="margin-top:8px;display:grid;gap:4px;">
