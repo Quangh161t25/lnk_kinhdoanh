@@ -2536,34 +2536,23 @@ function renderThuong() {
   });
 
   const specialNvName = "Lê Quang Tuyến";
+  const targetNvs = ["ngô tuấn anh", "trần doãn sáng", "kiều trung đức", "vũ công tâm", "đoàn văn quang"];
   const monthlyRevenueMap = {};
   Object.values(salesMap).forEach(entry => {
-    monthlyRevenueMap[entry.thang] = (monthlyRevenueMap[entry.thang] || 0) + Number(entry.ds_thuong || 0);
-  });
-  
-  const vuGiaSalesByMonth = {};
-  (appState.DH_CT || []).forEach(row => {
-    const loaiSp = normalizeProductType(row.sp_chinh_thuong);
-    if (loaiSp === "thuong") {
-      const npp = String(row.npp || "").toLowerCase();
-      const idKh = String(row.id_khach_hang || "").toLowerCase();
-      if (npp.includes("vũ gia") || idKh.includes("vũ gia")) {
-        const thang = parseThangFromDate(row.ngay || "");
-        if (thang) {
-          vuGiaSalesByMonth[thang] = (vuGiaSalesByMonth[thang] || 0) + Number(row.thanh_tien || 0);
-        }
-      }
+    const nvIdLower = String(entry.nvId || "").trim().toLowerCase();
+    if (targetNvs.includes(nvIdLower)) {
+      monthlyRevenueMap[entry.thang] = (monthlyRevenueMap[entry.thang] || 0) + Number(entry.ds_thuong || 0);
     }
   });
 
   Object.entries(monthlyRevenueMap).forEach(([thang, monthlyRevenue]) => {
-    const finalRevenue = monthlyRevenue - (vuGiaSalesByMonth[thang] || 0);
-    if (finalRevenue <= 0 && monthlyRevenue <= 0) return;
+    const finalRevenue = monthlyRevenue;
+    if (finalRevenue <= 0) return;
     const specialRow = {
       thang,
       nvId: specialNvName,
       ds_chinh: 0,
-      ds_thuong: finalRevenue > 0 ? finalRevenue : 0,
+      ds_thuong: finalRevenue,
       ds_r1: 0,
       thuong_sp_chinh: 0,
       thuong_sp_thuong: 0,
@@ -2572,7 +2561,7 @@ function renderThuong() {
       ti_le_thu_no: 0,
       no_phat_sinh: 0,
       no_da_thu: 0,
-      tong_tien_thuong: Math.round((finalRevenue > 0 ? finalRevenue : 0) * 0.002)
+      tong_tien_thuong: Math.round(finalRevenue * 0.002)
     };
     const existingIndex = rows.findIndex(row => row.thang === thang && String(row.nvId || "").trim().toLowerCase() === specialNvName.toLowerCase());
     if (existingIndex >= 0) rows[existingIndex] = specialRow;
