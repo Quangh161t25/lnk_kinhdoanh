@@ -640,6 +640,33 @@ function renderSalesDashboard() {
           <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Doanh số theo tháng</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Tháng</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Đã thu</th><th style="text-align:right">Nợ ròng tháng</th><th style="text-align:right">Dư nợ cuối tháng</th></tr></thead><tbody id="dTMonth"></tbody></table></div></div>
           <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Nhân viên (Mã NV)</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Mã NV</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Nợ đã thu</th><th style="text-align:right">Nợ ròng</th><th style="text-align:right">Dư nợ cuối</th><th style="text-align:right">Tỉ lệ thu (tháng này)</th></tr></thead><tbody id="dTNv"></tbody></table></div></div>
           <div class="card" style="padding:0;overflow:hidden"><h3 style="margin:0;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:14px">Bảng Doanh số theo Khách hàng</h3><div class="table-wrap"><table style="min-width:100%"><thead><tr><th>Mã KH</th><th>Tên KH</th><th style="text-align:right">Doanh số</th><th style="text-align:right">Số đơn</th><th style="text-align:right">Nợ phát sinh</th><th style="text-align:right">Đã thu</th><th style="text-align:right">Nợ ròng tháng</th><th style="text-align:right">Dư nợ cuối tháng</th></tr></thead><tbody id="dTKh"></tbody></table></div><div class="pagination" id="dTKhPagination"></div></div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f8fafc;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:10px;">
+              <h3 style="margin:0;font-size:14px">Bảng Danh sách sản phẩm</h3>
+              <input type="text" id="dTSpSearch" placeholder="Tìm mã, tên sản phẩm..." style="border:1px solid var(--line);padding:5px 10px;border-radius:6px;font-size:13px;outline:none;background:#fff;width:220px;" />
+            </div>
+            <div class="table-wrap">
+              <table style="min-width:100%">
+                <thead>
+                  <tr>
+                    <th>Mã sản phẩm</th>
+                    <th>Tên sản phẩm</th>
+                    <th style="text-align:right">Số lượng bán</th>
+                    <th style="text-align:right">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody id="dTSp"></tbody>
+                <tfoot id="dTSptfoot">
+                  <tr style="background:#f8fafc;font-weight:700;border-top:1px solid var(--line)">
+                    <td colspan="2">Tổng cộng</td>
+                    <td style="text-align:right" id="dTSpTotalQty">-</td>
+                    <td style="text-align:right;color:var(--brand)" id="dTSpTotalRevenue">-</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            <div class="pagination" id="dTSpPagination"></div>
+          </div>
         </div>
       `;
 
@@ -682,6 +709,8 @@ function renderSalesDashboard() {
   let msNv, msKh;
   let khCurrentPage = 1;
   const khPageSize = 20;
+  let spCurrentPage = 1;
+  const spPageSize = 20;
   const getPrevMonth = (ym) => {
     if (!ym) return null;
     const [y, m] = ym.split("-").map(Number);
@@ -970,15 +999,109 @@ function renderSalesDashboard() {
     });
     const nccKs = Object.keys(bNcc).sort((a, b) => bNcc[b].s - bNcc[a].s);
     document.getElementById("dTNcc").innerHTML = nccKs.map(k => `<tr><td>${safeText(k)}</td><td style="text-align:right;color:#0f172a"><strong>${money(bNcc[k].s)}</strong></td></tr>`).join("") || '<tr class="empty"><td colspan="2">Trống</td></tr>';
+
+    // Tổng hợp Bảng Danh sách sản phẩm
+    const spStats = {};
+    appState.DH_CT.forEach(detail => {
+      if (detail.id_dh && !validOrderIds.has(detail.id_dh)) return;
+      if (!detail.id_dh) {
+        if (fT) {
+          const ym = detail.ngay.includes("-") ? detail.ngay.slice(0, 7) : (detail.ngay.split("/").length >= 3 ? detail.ngay.split("/")[2] + "-" + detail.ngay.split("/")[1].padStart(2, "0") : "");
+          if (ym !== fT) return;
+        }
+        if (fNs.length > 0 && !fNs.includes(detail.id_nv)) return;
+        if (fKs.length > 0 && !fKs.includes(detail.npp)) return;
+      }
+      const spId = String(detail.id_sp || "").trim();
+      if (!spId) return;
+      if (!spStats[spId]) {
+        spStats[spId] = {
+          id: spId,
+          name: getProductName(spId),
+          slg: 0,
+          thanh_tien: 0
+        };
+      }
+      const slg = Number(detail.slg || 0);
+      const thanh_tien = Number(detail.thanh_tien || (Number(detail.don_gia || 0) * slg));
+      spStats[spId].slg += slg;
+      spStats[spId].thanh_tien += thanh_tien;
+    });
+
+    let spKs = Object.keys(spStats).sort((a, b) => {
+      const diff = (spStats[b].thanh_tien || 0) - (spStats[a].thanh_tien || 0);
+      if (diff !== 0) return diff;
+      return (spStats[b].slg || 0) - (spStats[a].slg || 0);
+    });
+
+    const spSearchTerm = (document.getElementById("dTSpSearch") ? document.getElementById("dTSpSearch").value : "").trim().toLowerCase();
+    if (spSearchTerm) {
+      spKs = spKs.filter(k => {
+        const item = spStats[k];
+        return k.toLowerCase().includes(spSearchTerm) || (item.name && item.name.toLowerCase().includes(spSearchTerm));
+      });
+    }
+
+    const totalSpQty = spKs.reduce((sum, k) => sum + (spStats[k].slg || 0), 0);
+    const totalSpRevenue = spKs.reduce((sum, k) => sum + (spStats[k].thanh_tien || 0), 0);
+
+    const dtSpFootQty = document.getElementById("dTSpTotalQty");
+    const dtSpFootRev = document.getElementById("dTSpTotalRevenue");
+    if (dtSpFootQty) dtSpFootQty.textContent = totalSpQty.toLocaleString("vi-VN");
+    if (dtSpFootRev) dtSpFootRev.textContent = money(totalSpRevenue);
+
+    const spTotalRows = spKs.length;
+    const spTotalPages = Math.ceil(spTotalRows / spPageSize) || 1;
+    if (spCurrentPage > spTotalPages) spCurrentPage = spTotalPages;
+    if (spCurrentPage < 1) spCurrentPage = 1;
+    const spStartIdx = (spCurrentPage - 1) * spPageSize;
+    const spPageRows = spKs.slice(spStartIdx, spStartIdx + spPageSize);
+
+    const buildSpRowHTML = (st) => `<tr>
+      <td class="mono">${safeText(st.id)}</td>
+      <td>${safeText(st.name)}</td>
+      <td style="text-align:right;font-weight:600">${Number(st.slg || 0).toLocaleString("vi-VN")}</td>
+      <td style="text-align:right;color:var(--text-main);font-weight:600">${money(st.thanh_tien)}</td>
+    </tr>`;
+
+    const dtSpElem = document.getElementById("dTSp");
+    if (dtSpElem) {
+      dtSpElem.innerHTML = spPageRows.map(k => buildSpRowHTML(spStats[k])).join("") || '<tr class="empty"><td colspan="4">Trống</td></tr>';
+    }
+
+    const spPager = document.getElementById("dTSpPagination");
+    if (spPager) {
+      if (spTotalRows <= spPageSize) {
+        spPager.innerHTML = `<span style="font-size:13px; color:var(--muted)">Hiển thị ${spTotalRows} sản phẩm.</span>`;
+      } else {
+        let pagerHtml = `<span style="font-size:13px; color:var(--muted)">Trang ${spCurrentPage} / ${spTotalPages} (Tổng ${spTotalRows} sản phẩm)</span><div class="pager">`;
+        pagerHtml += `<div class="page-box ${spCurrentPage === 1 ? 'disabled' : ''}" onclick="${spCurrentPage > 1 ? `window.setSalesProductPage(${spCurrentPage - 1})` : ''}">‹</div>`;
+        for (let p = 1; p <= spTotalPages; p++) {
+          if (p === 1 || p === spTotalPages || (p >= spCurrentPage - 2 && p <= spCurrentPage + 2)) {
+            pagerHtml += `<div class="page-box ${p === spCurrentPage ? 'active' : ''}" onclick="window.setSalesProductPage(${p})">${p}</div>`;
+          } else if (p === spCurrentPage - 3 || p === spCurrentPage + 3) {
+            pagerHtml += `<div class="page-box-dots">...</div>`;
+          }
+        }
+        pagerHtml += `<div class="page-box ${spCurrentPage === spTotalPages ? 'disabled' : ''}" onclick="${spCurrentPage < spTotalPages ? `window.setSalesProductPage(${spCurrentPage + 1})` : ''}">›</div>`;
+        pagerHtml += `</div>`;
+        spPager.innerHTML = pagerHtml;
+      }
+    }
   };
 
-  const resetCustomerPageAndDraw = () => { khCurrentPage = 1; draw(); };
+  const resetAllPagesAndDraw = () => { khCurrentPage = 1; spCurrentPage = 1; draw(); };
   window.setSalesCustomerPage = (page) => { khCurrentPage = page; draw(); };
-  msNv = setupMultiSelect("dashNvBtn", "dashNvMenu", "dashNvList", "dashNvSearch", "dashNvAll", "dashNvClear", nvArr, resetCustomerPageAndDraw, "ID Nhân viên");
-  msKh = setupMultiSelect("dashKhBtn", "dashKhMenu", "dashKhList", "dashKhSearch", "dashKhAll", "dashKhClear", khArr, resetCustomerPageAndDraw, "ID Khách hàng");
+  window.setSalesProductPage = (page) => { spCurrentPage = page; draw(); };
+  msNv = setupMultiSelect("dashNvBtn", "dashNvMenu", "dashNvList", "dashNvSearch", "dashNvAll", "dashNvClear", nvArr, resetAllPagesAndDraw, "ID Nhân viên");
+  msKh = setupMultiSelect("dashKhBtn", "dashKhMenu", "dashKhList", "dashKhSearch", "dashKhAll", "dashKhClear", khArr, resetAllPagesAndDraw, "ID Khách hàng");
 
-  document.getElementById("dashTime").addEventListener("change", resetCustomerPageAndDraw);
-  document.getElementById("dashTimeClr").addEventListener("click", () => { document.getElementById("dashTime").value = ""; resetCustomerPageAndDraw(); });
+  document.getElementById("dashTime").addEventListener("change", resetAllPagesAndDraw);
+  document.getElementById("dashTimeClr").addEventListener("click", () => { document.getElementById("dashTime").value = ""; resetAllPagesAndDraw(); });
+  const spSearchInput = document.getElementById("dTSpSearch");
+  if (spSearchInput) {
+    spSearchInput.addEventListener("input", () => { spCurrentPage = 1; draw(); });
+  }
 
   if (typeof Chart === 'undefined') {
     const s = document.createElement('script'); s.src = "https://cdn.jsdelivr.net/npm/chart.js";
