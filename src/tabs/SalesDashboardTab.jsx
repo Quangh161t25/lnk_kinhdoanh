@@ -5,6 +5,7 @@ import MultiSelect from "../components/common/MultiSelect.jsx";
 import Pagination, { paginate } from "../components/common/Pagination.jsx";
 import { computeSalesDashboard } from "../lib/salesDashboard.js";
 import { money, debtColor } from "../lib/format.js";
+import DataTable from "../components/table/DataTable.jsx";
 
 const PAGE_SIZE = 20;
 const TYPE_COLORS = ["#2563eb", "#7c3aed", "#ea580c", "#16a34a", "#db2777", "#0284c7"];
@@ -12,7 +13,6 @@ const CARD = { padding: "12px 14px", border: "none", boxShadow: "0 2px 8px rgba(
 const CARD_LABEL = { color: "var(--muted)", fontWeight: 700, fontSize: 10 };
 const CARD_VALUE = { display: "block", fontSize: 16, marginTop: 4 };
 const TABLE_TITLE = { margin: 0, padding: "14px 16px", background: "#f8fafc", borderBottom: "1px solid var(--line)", fontSize: 14 };
-const RIGHT = { textAlign: "right" };
 const SALES_CELL = { textAlign: "right", color: "var(--text-main)", fontWeight: 600 };
 
 function SummaryCard({ label, value, color, labelColor }) {
@@ -24,21 +24,36 @@ function SummaryCard({ label, value, color, labelColor }) {
   );
 }
 
-// Các ô nợ dùng chung cho bảng tháng/khách hàng/nhân viên.
-function DebtCells({ chi, thu, luyKe }) {
-  return (
-    <>
-      <td style={{ textAlign: "right", color: "#ef4444" }}>{money(chi)}</td>
-      <td style={{ textAlign: "right", color: "#16a34a" }}>{money(thu)}</td>
-      <td style={{ textAlign: "right", color: debtColor(chi - thu) }}>{money(chi - thu)}</td>
-      <td style={{ textAlign: "right", fontWeight: "bold", color: debtColor(luyKe) }}>{money(luyKe)}</td>
-    </>
-  );
-}
+const TOOLBAR = { padding: "8px 12px 0" };
 
-const EmptyRow = ({ cols, className }) => (className
-  ? <tr className="empty"><td colSpan={cols}>Trống</td></tr>
-  : <tr><td colSpan={cols} className="empty">Trống</td></tr>);
+// Các cột nợ dùng chung cho bảng tháng/khách hàng/nhân viên.
+const debtColumns = (labels) => [
+  { key: "chi", label: labels[0], align: "right", style: { color: "#ef4444" }, render: (row) => money(row.chi) },
+  { key: "thu", label: labels[1], align: "right", style: { color: "#16a34a" }, render: (row) => money(row.thu) },
+  { key: "rong", label: labels[2], align: "right", style: (row) => ({ color: debtColor(row.chi - row.thu) }), render: (row) => money(row.chi - row.thu) },
+  { key: "luy_ke", label: labels[3], align: "right", style: (row) => ({ fontWeight: "bold", color: debtColor(row.luyKe) }), render: (row) => money(row.luyKe) }
+];
+const MONTH_DEBT_LABELS = ["Nợ phát sinh", "Đã thu", "Nợ ròng tháng", "Dư nợ cuối tháng"];
+
+const NCC_COLUMNS = [
+  { key: "name", label: "Tên NCC", render: (row) => row.name },
+  { key: "s", label: "Tổng D/số", align: "right", style: { color: "#0f172a" }, render: (row) => <strong>{money(row.s)}</strong> }
+];
+
+const MONTH_COLUMNS = [
+  { key: "month", label: "Tháng", className: "mono", render: (row) => row.month },
+  { key: "s", label: "Doanh số", align: "right", style: SALES_CELL, render: (row) => money(row.s) },
+  { key: "c", label: "Số đơn", align: "right", render: (row) => row.c },
+  ...debtColumns(MONTH_DEBT_LABELS)
+];
+
+const staffRatio = (row) => (row.chiCM > 0 ? (row.thuCM / row.chiCM) * 100 : 0);
+const STAFF_COLUMNS = [
+  { key: "id", label: "Mã NV", className: "mono", render: (row) => row.id },
+  { key: "s", label: "Doanh số", align: "right", style: SALES_CELL, render: (row) => money(row.s) },
+  ...debtColumns(["Nợ phát sinh", "Nợ đã thu", "Nợ ròng", "Dư nợ cuối"]),
+  { key: "ti_le", label: "Tỉ lệ thu (tháng này)", align: "right", style: (row) => ({ fontWeight: 600, color: staffRatio(row) >= 100 ? "#16a34a" : "#f59e0b" }), render: (row) => staffRatio(row).toFixed(1) + "%" }
+];
 
 // Thanh lọc dính dưới topbar khi cuộn (position: fixed vì khung cuộn là cả cửa sổ).
 function useStickyFilter(wrapRef, filterRef) {
@@ -125,6 +140,20 @@ export default function SalesDashboardTab() {
   const totalQty = products.reduce((sum, row) => sum + (row.slg || 0), 0);
   const totalRevenue = products.reduce((sum, row) => sum + (row.thanh_tien || 0), 0);
 
+  const customerColumns = [
+    { key: "id", label: "Mã KH", className: "mono", render: (row) => row.id },
+    { key: "ten_kh", label: "Tên KH", render: (row) => customerName(row.id) },
+    { key: "s", label: "Doanh số", align: "right", style: SALES_CELL, render: (row) => money(row.s) },
+    { key: "c", label: "Số đơn", align: "right", render: (row) => row.c },
+    ...debtColumns(MONTH_DEBT_LABELS)
+  ];
+  const productColumns = [
+    { key: "id", label: "Mã sản phẩm", className: "mono", render: (row) => row.id },
+    { key: "name", label: "Tên sản phẩm", render: (row) => row.name },
+    { key: "slg", label: "Số lượng bán", align: "right", style: { fontWeight: 600 }, render: (row) => Number(row.slg || 0).toLocaleString("vi-VN"), footer: totalQty.toLocaleString("vi-VN") },
+    { key: "thanh_tien", label: "Thành tiền", align: "right", style: SALES_CELL, render: (row) => money(row.thanh_tien), footer: money(totalRevenue), footerStyle: { color: "var(--brand)" } }
+  ];
+
   return (
     <>
       <div className="sales-dash-filter-wrap" ref={wrapRef}>
@@ -155,16 +184,16 @@ export default function SalesDashboardTab() {
       <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr", gap: 20, marginBottom: 20 }}>
         <div className="card" style={{ padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           <h3 style={TABLE_TITLE}>Bảng Doanh số theo NCC</h3>
-          <div className="table-wrap" style={{ flex: 1, maxHeight: 260, overflowY: "auto" }}>
-            <table style={{ minWidth: "100%" }}>
-              <thead><tr><th>Tên NCC</th><th style={RIGHT}>Tổng D/số</th></tr></thead>
-              <tbody>
-                {stats.nccRows.length
-                  ? stats.nccRows.map((row) => <tr key={row.name}><td>{row.name}</td><td style={{ textAlign: "right", color: "#0f172a" }}><strong>{money(row.s)}</strong></td></tr>)
-                  : <EmptyRow cols={2} className />}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            id="dash-ncc"
+            name="Doanh số theo NCC"
+            columns={NCC_COLUMNS}
+            rows={stats.nccRows}
+            rowKey={(row) => row.name}
+            toolbarStyle={TOOLBAR}
+            wrapStyle={{ flex: 1, maxHeight: 260, overflowY: "auto" }}
+            tableStyle={{ minWidth: "100%" }}
+          />
         </div>
         <div className="card" style={{ padding: 16 }}>
           <h3 style={{ margin: "0 0 16px", fontSize: 14 }}>Doanh số theo tháng</h3>
@@ -175,63 +204,41 @@ export default function SalesDashboardTab() {
       <div style={{ display: "grid", gap: 20, marginBottom: 40 }}>
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <h3 style={TABLE_TITLE}>Bảng Doanh số theo tháng</h3>
-          <div className="table-wrap"><table style={{ minWidth: "100%" }}>
-            <thead><tr><th>Tháng</th><th style={RIGHT}>Doanh số</th><th style={RIGHT}>Số đơn</th><th style={RIGHT}>Nợ phát sinh</th><th style={RIGHT}>Đã thu</th><th style={RIGHT}>Nợ ròng tháng</th><th style={RIGHT}>Dư nợ cuối tháng</th></tr></thead>
-            <tbody>
-              {stats.monthRows.length
-                ? stats.monthRows.map((row) => (
-                  <tr key={row.month}>
-                    <td className="mono">{row.month}</td>
-                    <td style={SALES_CELL}>{money(row.s)}</td>
-                    <td style={RIGHT}>{row.c}</td>
-                    <DebtCells chi={row.chi} thu={row.thu} luyKe={row.luyKe} />
-                  </tr>
-                ))
-                : <EmptyRow cols={7} />}
-            </tbody>
-          </table></div>
+          <DataTable
+            id="dash-month"
+            name="Doanh số theo tháng"
+            columns={MONTH_COLUMNS}
+            rows={stats.monthRows}
+            rowKey={(row) => row.month}
+            toolbarStyle={TOOLBAR}
+            tableStyle={{ minWidth: "100%" }}
+          />
         </div>
 
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <h3 style={TABLE_TITLE}>Bảng Nhân viên (Mã NV)</h3>
-          <div className="table-wrap"><table style={{ minWidth: "100%" }}>
-            <thead><tr><th>Mã NV</th><th style={RIGHT}>Doanh số</th><th style={RIGHT}>Nợ phát sinh</th><th style={RIGHT}>Nợ đã thu</th><th style={RIGHT}>Nợ ròng</th><th style={RIGHT}>Dư nợ cuối</th><th style={RIGHT}>Tỉ lệ thu (tháng này)</th></tr></thead>
-            <tbody>
-              {stats.nvRows.length
-                ? stats.nvRows.map((row) => {
-                  const ratio = row.chiCM > 0 ? (row.thuCM / row.chiCM) * 100 : 0;
-                  return (
-                    <tr key={row.id}>
-                      <td className="mono">{row.id}</td>
-                      <td style={SALES_CELL}>{money(row.s)}</td>
-                      <DebtCells chi={row.chi} thu={row.thu} luyKe={row.luyKe} />
-                      <td style={{ textAlign: "right", fontWeight: 600, color: ratio >= 100 ? "#16a34a" : "#f59e0b" }}>{ratio.toFixed(1) + "%"}</td>
-                    </tr>
-                  );
-                })
-                : <EmptyRow cols={7} className />}
-            </tbody>
-          </table></div>
+          <DataTable
+            id="dash-staff"
+            name="Nhân viên (Mã NV)"
+            columns={STAFF_COLUMNS}
+            rows={stats.nvRows}
+            rowKey={(row) => row.id}
+            toolbarStyle={TOOLBAR}
+            tableStyle={{ minWidth: "100%" }}
+          />
         </div>
 
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <h3 style={TABLE_TITLE}>Bảng Doanh số theo Khách hàng</h3>
-          <div className="table-wrap"><table style={{ minWidth: "100%" }}>
-            <thead><tr><th>Mã KH</th><th>Tên KH</th><th style={RIGHT}>Doanh số</th><th style={RIGHT}>Số đơn</th><th style={RIGHT}>Nợ phát sinh</th><th style={RIGHT}>Đã thu</th><th style={RIGHT}>Nợ ròng tháng</th><th style={RIGHT}>Dư nợ cuối tháng</th></tr></thead>
-            <tbody>
-              {kh.rows.length
-                ? kh.rows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="mono">{row.id}</td>
-                    <td>{customerName(row.id)}</td>
-                    <td style={SALES_CELL}>{money(row.s)}</td>
-                    <td style={RIGHT}>{row.c}</td>
-                    <DebtCells chi={row.chi} thu={row.thu} luyKe={row.luyKe} />
-                  </tr>
-                ))
-                : <EmptyRow cols={8} className />}
-            </tbody>
-          </table></div>
+          <DataTable
+            id="dash-customers"
+            name="Doanh số theo khách hàng"
+            columns={customerColumns}
+            rows={kh.rows}
+            rowKey={(row) => row.id}
+            toolbarStyle={TOOLBAR}
+            tableStyle={{ minWidth: "100%" }}
+          />
           <Pagination page={kh.page} pageSize={PAGE_SIZE} totalRows={stats.khRows.length} noun="khách hàng" onPage={setKhPage} />
         </div>
 
@@ -241,37 +248,17 @@ export default function SalesDashboardTab() {
             <input type="text" placeholder="Tìm mã, tên sản phẩm..." value={productSearch} onChange={(e) => { setProductSearch(e.target.value); setSpPage(1); }}
               style={{ border: "1px solid var(--line)", padding: "5px 10px", borderRadius: 6, fontSize: 13, outline: "none", background: "#fff", width: 220 }} />
           </div>
-          <div className="table-wrap">
-            <table style={{ minWidth: "100%" }}>
-              <thead>
-                <tr>
-                  <th>Mã sản phẩm</th>
-                  <th>Tên sản phẩm</th>
-                  <th style={RIGHT}>Số lượng bán</th>
-                  <th style={RIGHT}>Thành tiền</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sp.rows.length
-                  ? sp.rows.map((row) => (
-                    <tr key={row.id}>
-                      <td className="mono">{row.id}</td>
-                      <td>{row.name}</td>
-                      <td style={{ textAlign: "right", fontWeight: 600 }}>{Number(row.slg || 0).toLocaleString("vi-VN")}</td>
-                      <td style={SALES_CELL}>{money(row.thanh_tien)}</td>
-                    </tr>
-                  ))
-                  : <EmptyRow cols={4} className />}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: "#f8fafc", fontWeight: 700, borderTop: "1px solid var(--line)" }}>
-                  <td colSpan="2">Tổng cộng</td>
-                  <td style={RIGHT}>{totalQty.toLocaleString("vi-VN")}</td>
-                  <td style={{ textAlign: "right", color: "var(--brand)" }}>{money(totalRevenue)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <DataTable
+            id="dash-products"
+            name="Danh sách sản phẩm"
+            columns={productColumns}
+            rows={sp.rows}
+            rowKey={(row) => row.id}
+            footerLabel="Tổng cộng"
+            footerRowStyle={{ background: "#f8fafc", fontWeight: 700, borderTop: "1px solid var(--line)" }}
+            toolbarStyle={TOOLBAR}
+            tableStyle={{ minWidth: "100%" }}
+          />
           <Pagination page={sp.page} pageSize={PAGE_SIZE} totalRows={products.length} noun="sản phẩm" onPage={setSpPage} />
         </div>
       </div>

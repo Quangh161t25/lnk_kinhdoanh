@@ -6,6 +6,7 @@ import { showToast, showBusyToast, hideToast } from "../components/Toast.jsx";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
 import { readWorkbook, excelSerialToDate, toAmount } from "../lib/excel.js";
 import { money, formatDateVi, formatDateInput, parseDateSort, randomId, todayInput } from "../lib/format.js";
+import DataTable from "../components/table/DataTable.jsx";
 
 const READONLY = { background: "var(--soft)" };
 
@@ -160,28 +161,29 @@ export default function DebtsTab() {
           <button className="btn btn-secondary" type="button" onClick={() => setFilters({ start: "", end: "", type: "", customerId: "", customerText: "" })}>Bỏ lọc</button>
         </div>
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>ID</th><th>Ngày</th><th>Khách hàng</th><th>ID đơn</th><th>Thu/Chi</th><th>Số tiền</th><th>Công nợ Ảo</th></tr></thead>
-          <tbody>
-            {!rows.length && <tr><td colSpan="7" className="empty">Không tìm thấy dữ liệu phù hợp.</td></tr>}
-            {rows.map((item, index) => {
-              const isThu = item.thu_chi === "thu";
-              return (
-                <tr key={`${item.id}-${index}`} data-action="view-debt" style={{ cursor: "pointer" }} onDoubleClick={() => openDebtDrawer(drawer, data, item.id)}>
-                  <td className="mono">{item.id}</td>
-                  <td>{formatDateVi(item.ngay)}</td>
-                  <td>{customerName(item.id_khach_hang)}</td>
-                  <td>{item.id_dh || ""}</td>
-                  <td><span className={`badge ${isThu ? "badge-thu" : "badge-chi"}`}>{isThu ? "Thu" : "Chi"}</span></td>
-                  <td><span style={{ color: isThu ? "#16a34a" : "#ef4444" }}>{isThu ? "-" : "+"}{money(item.so_tien)}</span></td>
-                  <td><strong style={{ color: "var(--brand)" }}>{money(vMap[item.id])}</strong></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        id="debts"
+        name="Công nợ"
+        columns={[
+          { key: "id", label: "ID", className: "mono", render: (item) => item.id },
+          { key: "ngay", label: "Ngày", render: (item) => formatDateVi(item.ngay) },
+          { key: "khach_hang", label: "Khách hàng", render: (item) => customerName(item.id_khach_hang) },
+          { key: "id_dh", label: "ID đơn", render: (item) => item.id_dh || "" },
+          {
+            key: "thu_chi", label: "Thu/Chi",
+            render: (item) => <span className={`badge ${item.thu_chi === "thu" ? "badge-thu" : "badge-chi"}`}>{item.thu_chi === "thu" ? "Thu" : "Chi"}</span>
+          },
+          {
+            key: "so_tien", label: "Số tiền",
+            render: (item) => <span style={{ color: item.thu_chi === "thu" ? "#16a34a" : "#ef4444" }}>{item.thu_chi === "thu" ? "-" : "+"}{money(item.so_tien)}</span>
+          },
+          { key: "cong_no_ao", label: "Công nợ Ảo", render: (item) => <strong style={{ color: "var(--brand)" }}>{money(vMap[item.id])}</strong> }
+        ]}
+        rows={rows}
+        rowKey={(item, index) => `${item.id}-${index}`}
+        rowProps={(item) => ({ "data-action": "view-debt", style: { cursor: "pointer" }, onDoubleClick: () => openDebtDrawer(drawer, data, item.id) })}
+        empty="Không tìm thấy dữ liệu phù hợp."
+      />
     </div>
   );
 }

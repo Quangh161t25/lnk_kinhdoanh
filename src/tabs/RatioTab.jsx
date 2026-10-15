@@ -4,6 +4,7 @@ import { usePersistentState } from "../store/persistentState.js";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
 import Pagination, { paginate } from "../components/common/Pagination.jsx";
 import { money, parseLooseNumber } from "../lib/format.js";
+import DataTable from "../components/table/DataTable.jsx";
 
 const PAGE_SIZE = 50;
 const FILTER_BOX = { display: "flex", alignItems: "center", background: "#fff", border: "1px solid var(--line)", borderRadius: 8, padding: "0 10px", height: 38 };
@@ -26,6 +27,27 @@ function SummaryCard({ label, value, color, labelColor, background, border }) {
     </div>
   );
 }
+
+const SUMMARY_HEAD = { ...SUMMARY_CELL, background: "#f8fafc" };
+const RATIO_STAFF_COLUMNS = [
+  { key: "nv", label: "NHÂN VIÊN QUẢN LÝ", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 700, color: "#475569" }, render: (s) => s.nv },
+  { key: "ds", label: "DOANH THU ĐẠT", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 600 }, render: (s) => money(s.ds) },
+  { key: "tt", label: "TỈ TRỌNG KPI (%)", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, color: "#6366f1", fontWeight: 700 }, render: (s) => `${(s.tt_tong * 100).toFixed(2)}%` },
+  { key: "kpi", label: "KPI NĂM 2026", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 600 }, render: (s) => money(s.kpi) },
+  { key: "kpi_thang", label: "KPI TB THÁNG", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 600 }, render: (s) => money(s.kpi_thang) },
+  { key: "con_thieu", label: "D.THU CÒN THIẾU", align: "right", headerStyle: { ...SUMMARY_HEAD, color: "#ef4444" }, style: (s) => ({ ...SUMMARY_CELL, color: s.ds_con_thieu > 0 ? "#ef4444" : "#16a34a", fontWeight: 700 }), render: (s) => money(s.ds_con_thieu) }
+];
+
+const RATIO_CUSTOMER_COLUMNS = [
+  { key: "id", label: "ID", headerStyle: { width: 100 }, className: "mono", render: (r) => r.id },
+  { key: "ten_kh", label: "KHÁCH HÀNG", style: { fontWeight: 600 }, render: (r) => r.ten_kh },
+  { key: "nv", label: "NV QUẢN LÝ", headerStyle: { width: 180 }, render: (r) => r.nv_quan_ly },
+  { key: "kenh", label: "KÊNH", headerStyle: { width: 120 }, render: (r) => <span className="badge" style={{ background: r.kenh === "ONLINE" ? "#e0f2fe" : "#f1f5f9", color: r.kenh === "ONLINE" ? "#0369a1" : "#475569" }}>{r.kenh}</span> },
+  { key: "doanh_thu", label: "DOANH THU", align: "right", style: { fontWeight: 600 }, render: (r) => money(r.doanh_thu) },
+  { key: "ti_trong", label: "TỈ TRỌNG (%)", align: "right", style: { color: "var(--brand)", fontWeight: 700 }, render: (r) => `${(r.ti_trong * 100).toFixed(2)}%` },
+  { key: "kpi", label: "KPI 2026", align: "right", style: { color: "#16a34a", fontWeight: 600 }, render: (r) => money(r.kpi_2026) },
+  { key: "kpi_thang", label: "KPI THÁNG 2026", align: "right", style: { color: "#16a34a", fontWeight: 600 }, render: (r) => money(r.kpi_thang_2026) }
+];
 
 export default function RatioTab() {
   const { data } = useData();
@@ -148,65 +170,28 @@ export default function RatioTab() {
 
         <div className="summary-card-inner" style={{ marginBottom: 24 }}>
           <div className="summary-title"><div style={{ width: 4, height: 14, background: "#6366f1", borderRadius: 2 }}></div>TỔNG HỢP THEO NHÂN VIÊN (KPI 2026)</div>
-          <div className="table-wrap">
-            <table style={{ fontSize: 12, borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc", borderBottom: "2px solid var(--line)" }}>
-                  <th style={SUMMARY_CELL}>NHÂN VIÊN QUẢN LÝ</th>
-                  <th style={{ ...SUMMARY_CELL, textAlign: "right" }}>DOANH THU ĐẠT</th>
-                  <th style={{ ...SUMMARY_CELL, textAlign: "right" }}>TỈ TRỌNG KPI (%)</th>
-                  <th style={{ ...SUMMARY_CELL, textAlign: "right" }}>KPI NĂM 2026</th>
-                  <th style={{ ...SUMMARY_CELL, textAlign: "right" }}>KPI TB THÁNG</th>
-                  <th style={{ ...SUMMARY_CELL, textAlign: "right", color: "#ef4444" }}>D.THU CÒN THIẾU</th>
-                </tr>
-              </thead>
-              <tbody>
-                {staffSummary.map((s) => (
-                  <tr key={s.nv} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td style={{ ...SUMMARY_CELL, fontWeight: 700, color: "#475569" }}>{s.nv}</td>
-                    <td style={{ ...SUMMARY_CELL, textAlign: "right", fontWeight: 600 }}>{money(s.ds)}</td>
-                    <td style={{ ...SUMMARY_CELL, textAlign: "right", color: "#6366f1", fontWeight: 700 }}>{(s.tt_tong * 100).toFixed(2)}%</td>
-                    <td style={{ ...SUMMARY_CELL, textAlign: "right", fontWeight: 600 }}>{money(s.kpi)}</td>
-                    <td style={{ ...SUMMARY_CELL, textAlign: "right", fontWeight: 600 }}>{money(s.kpi_thang)}</td>
-                    <td style={{ ...SUMMARY_CELL, textAlign: "right", color: s.ds_con_thieu > 0 ? "#ef4444" : "#16a34a", fontWeight: 700 }}>{money(s.ds_con_thieu)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            id="ratio-staff"
+            name="Tổng hợp theo nhân viên"
+            columns={RATIO_STAFF_COLUMNS}
+            rows={staffSummary}
+            rowKey={(s) => s.nv}
+            rowProps={() => ({ style: { borderBottom: "1px solid #f1f5f9" } })}
+            tableStyle={{ fontSize: 12, borderCollapse: "collapse" }}
+          />
         </div>
 
         <div className="summary-title" style={{ marginLeft: 4 }}><div style={{ width: 4, height: 14, background: "#00b894", borderRadius: 2 }}></div>CHI TIẾT THEO KHÁCH HÀNG</div>
-        <div className="table-wrap" style={{ maxHeight: "calc(100vh - 450px)", overflow: "auto" }}>
-          <table style={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead style={{ position: "sticky", top: 0, zIndex: 10, background: "#f8fafc", boxShadow: "0 1px 0 var(--line)" }}>
-              <tr>
-                <th style={{ width: 100 }}>ID</th>
-                <th>KHÁCH HÀNG</th>
-                <th style={{ width: 180 }}>NV QUẢN LÝ</th>
-                <th style={{ width: 120 }}>KÊNH</th>
-                <th style={{ textAlign: "right" }}>DOANH THU</th>
-                <th style={{ textAlign: "right" }}>TỈ TRỌNG (%)</th>
-                <th style={{ textAlign: "right" }}>KPI 2026</th>
-                <th style={{ textAlign: "right" }}>KPI THÁNG 2026</th>
-              </tr>
-            </thead>
-            <tbody>
-              {current.rows.map((r, index) => (
-                <tr key={`${r.id}-${index}`}>
-                  <td className="mono">{r.id}</td>
-                  <td style={{ fontWeight: 600 }}>{r.ten_kh}</td>
-                  <td>{r.nv_quan_ly}</td>
-                  <td><span className="badge" style={{ background: r.kenh === "ONLINE" ? "#e0f2fe" : "#f1f5f9", color: r.kenh === "ONLINE" ? "#0369a1" : "#475569" }}>{r.kenh}</span></td>
-                  <td style={{ textAlign: "right", fontWeight: 600 }}>{money(r.doanh_thu)}</td>
-                  <td style={{ textAlign: "right", color: "var(--brand)", fontWeight: 700 }}>{(r.ti_trong * 100).toFixed(2)}%</td>
-                  <td style={{ textAlign: "right", color: "#16a34a", fontWeight: 600 }}>{money(r.kpi_2026)}</td>
-                  <td style={{ textAlign: "right", color: "#16a34a", fontWeight: 600 }}>{money(r.kpi_thang_2026)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          id="ratio-customers"
+          name="Chi tiết theo khách hàng"
+          columns={RATIO_CUSTOMER_COLUMNS}
+          rows={current.rows}
+          rowKey={(r, index) => `${r.id}-${index}`}
+          wrapStyle={{ maxHeight: "calc(100vh - 450px)", overflow: "auto" }}
+          tableStyle={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}
+          theadStyle={{ position: "sticky", top: 0, zIndex: 10, background: "#f8fafc", boxShadow: "0 1px 0 var(--line)" }}
+        />
         <Pagination page={current.page} pageSize={PAGE_SIZE} totalRows={rows.length} noun="khách hàng" onPage={setPage} />
       </div>
     </div>

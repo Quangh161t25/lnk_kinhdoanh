@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useData } from "../store/DataContext.jsx";
 import { useDrawer } from "../components/Drawer.jsx";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
+import DataTable from "../components/table/DataTable.jsx";
 import { money, formatDateVi, parseDateSort, randomId, todayInput } from "../lib/format.js";
 
 const ADD_BUTTON_STYLE = { padding: "0 12px", fontSize: 20, borderRadius: 8, height: 32, display: "flex", alignItems: "center", justifyContent: "center" };
@@ -71,35 +72,38 @@ export default function CustomersTab() {
           <button className="btn btn-secondary" type="button" onClick={resetFilters}>Bỏ lọc</button>
         </div>
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>ID</th><th>Tên KH</th><th>Điện thoại</th><th>Email</th><th>NV quản lý</th><th title="KÊNH">KÊNH</th><th title="Tỷ trọng mục tiêu">TT</th><th>Tiền bán hàng</th><th>Tiền thu nợ</th><th>Công nợ</th><th>Trạng thái</th></tr></thead>
-          <tbody>
-            {!rows.length && <tr><td colSpan="9" className="empty">Không tìm thấy khách hàng phù hợp.</td></tr>}
-            {rows.map(({ item, stats: { banHang, thuNo, congNo } }, index) => {
-              const highDebt = congNo > 10000000;
-              return (
-                <tr key={`${item.id}-${index}`} data-action="view-customer" className={highDebt ? "row-debt-high" : ""} style={{ cursor: "pointer" }} onDoubleClick={() => openDetail(item.id)}>
-                  <td className="mono">{item.id}</td>
-                  <td style={highDebt ? { color: "#dc2626", fontWeight: 700 } : undefined}>{item.ten_kh}</td>
-                  <td>{item.dien_thoai || ""}</td>
-                  <td>{item.email || ""}</td>
-                  <td>{item.nv_quan_ly || ""}</td>
-                  <td style={{ fontWeight: 600 }}>{item.kenh || ""}</td>
-                  <td style={{ fontWeight: 600, textAlign: "center" }}>{item.tt || ""}</td>
-                  <td>{money(banHang)}</td>
-                  <td>{money(thuNo)}</td>
-                  <td><strong style={{ color: debtTone(congNo) }}>{money(congNo)}</strong></td>
-                  <td><StatusBadge congNo={congNo} paidText="Đã TT" /></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        id="customers"
+        name="Khách hàng"
+        columns={CUSTOMER_COLUMNS}
+        rows={rows}
+        rowKey={({ item }, index) => `${item.id}-${index}`}
+        rowProps={({ item, stats }) => ({
+          "data-action": "view-customer",
+          className: stats.congNo > HIGH_DEBT ? "row-debt-high" : "",
+          style: { cursor: "pointer" },
+          onDoubleClick: () => openDetail(item.id)
+        })}
+        empty="Không tìm thấy khách hàng phù hợp."
+      />
     </div>
   );
 }
+
+const HIGH_DEBT = 10000000;
+const CUSTOMER_COLUMNS = [
+  { key: "id", label: "ID", className: "mono", render: ({ item }) => item.id },
+  { key: "ten_kh", label: "Tên KH", style: ({ stats }) => (stats.congNo > HIGH_DEBT ? { color: "#dc2626", fontWeight: 700 } : undefined), render: ({ item }) => item.ten_kh },
+  { key: "dien_thoai", label: "Điện thoại", render: ({ item }) => item.dien_thoai || "" },
+  { key: "email", label: "Email", render: ({ item }) => item.email || "" },
+  { key: "nv_quan_ly", label: "NV quản lý", render: ({ item }) => item.nv_quan_ly || "" },
+  { key: "kenh", label: "KÊNH", style: { fontWeight: 600 }, render: ({ item }) => item.kenh || "" },
+  { key: "tt", label: "TT", title: "Tỷ trọng mục tiêu", style: { fontWeight: 600 }, align: "center", render: ({ item }) => item.tt || "" },
+  { key: "ban_hang", label: "Tiền bán hàng", render: ({ stats }) => money(stats.banHang) },
+  { key: "thu_no", label: "Tiền thu nợ", render: ({ stats }) => money(stats.thuNo) },
+  { key: "cong_no", label: "Công nợ", render: ({ stats }) => <strong style={{ color: debtTone(stats.congNo) }}>{money(stats.congNo)}</strong> },
+  { key: "trang_thai", label: "Trạng thái", render: ({ stats }) => <StatusBadge congNo={stats.congNo} paidText="Đã TT" /> }
+];
 
 function StatusBadge({ congNo, paidText }) {
   if (congNo === 0) return <span className="badge-status bs-paid">{paidText}</span>;
@@ -155,32 +159,53 @@ function CustomerDetail({ customerId }) {
       )}
       <div>
         <h4 style={{ margin: "0 0 6px", fontSize: 13, color: "var(--muted)" }}>DANH SÁCH ĐƠN HÀNG ({orders.length})</h4>
-        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", fontSize: 12 }}><thead><tr><th>ID ĐƠN</th><th>Ngày</th><th>Thành tiền</th></tr></thead><tbody>
-          {orders.length
-            ? orders.map((o, i) => <tr key={`${o.id}-${i}`}><td className="mono">{o.id}</td><td>{formatDateVi(o.ngay)}</td><td><strong>{money(o.thanh_tien)}</strong></td></tr>)
-            : <tr><td colSpan="3" className="empty">Chưa có đơn hàng.</td></tr>}
-        </tbody></table></div>
+        <DataTable
+          id="customer-orders"
+          name="Đơn hàng của khách"
+          columns={CUSTOMER_ORDER_COLUMNS}
+          rows={orders}
+          rowKey={(o, i) => `${o.id}-${i}`}
+          empty="Chưa có đơn hàng."
+          wrapClassName=""
+          wrapStyle={{ overflowX: "auto" }}
+          tableStyle={{ width: "100%", fontSize: 12 }}
+        />
       </div>
       <div>
         <h4 style={{ margin: "0 0 6px", fontSize: 13, color: "var(--muted)" }}>LỊCH SỬ THU NỢ ({payments.length})</h4>
-        <div style={{ overflowX: "auto" }}><table style={{ width: "100%", fontSize: 12 }}><thead><tr><th>Ngày</th><th>Loại</th><th>Số tiền</th></tr></thead><tbody>
-          {payments.length
-            ? payments.map((p, i) => {
-              const isThu = p.thu_chi === "thu";
-              return (
-                <tr key={`${p.id}-${i}`}>
-                  <td>{formatDateVi(p.ngay)}</td>
-                  <td><span className={`badge ${isThu ? "badge-thu" : "badge-chi"}`}>{isThu ? "Thu" : "Chi"}</span></td>
-                  <td><span style={{ color: isThu ? "#16a34a" : "#ef4444" }}>{isThu ? "-" : "+"}{money(p.so_tien)}</span></td>
-                </tr>
-              );
-            })
-            : <tr><td colSpan="3" className="empty">Chưa có giao dịch.</td></tr>}
-        </tbody></table></div>
+        <DataTable
+          id="customer-payments"
+          name="Lịch sử thu nợ"
+          columns={CUSTOMER_PAYMENT_COLUMNS}
+          rows={payments}
+          rowKey={(p, i) => `${p.id}-${i}`}
+          empty="Chưa có giao dịch."
+          wrapClassName=""
+          wrapStyle={{ overflowX: "auto" }}
+          tableStyle={{ width: "100%", fontSize: 12 }}
+        />
       </div>
     </div>
   );
 }
+
+const CUSTOMER_ORDER_COLUMNS = [
+  { key: "id", label: "ID ĐƠN", className: "mono", render: (o) => o.id },
+  { key: "ngay", label: "Ngày", render: (o) => formatDateVi(o.ngay) },
+  { key: "thanh_tien", label: "Thành tiền", render: (o) => <strong>{money(o.thanh_tien)}</strong> }
+];
+
+const CUSTOMER_PAYMENT_COLUMNS = [
+  { key: "ngay", label: "Ngày", render: (p) => formatDateVi(p.ngay) },
+  {
+    key: "loai", label: "Loại",
+    render: (p) => <span className={`badge ${p.thu_chi === "thu" ? "badge-thu" : "badge-chi"}`}>{p.thu_chi === "thu" ? "Thu" : "Chi"}</span>
+  },
+  {
+    key: "so_tien", label: "Số tiền",
+    render: (p) => <span style={{ color: p.thu_chi === "thu" ? "#16a34a" : "#ef4444" }}>{p.thu_chi === "thu" ? "-" : "+"}{money(p.so_tien)}</span>
+  }
+];
 
 function CustomerForm({ customerId }) {
   const { data, user, saveRecord } = useData();

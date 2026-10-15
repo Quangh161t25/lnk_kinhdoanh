@@ -22,16 +22,22 @@ export default function Sidebar({ activeTab, onSelect, syncMeta }) {
           <div className="menu-group" key={group}>
             <div className="menu-title">{group}</div>
             {items.map((item) => (
-              <button
+              <a
                 key={item.id}
-                type="button"
+                href={item.path}
                 title={item.label}
+                aria-current={item.id === activeTab ? "page" : undefined}
                 className={`nav-btn${item.id === activeTab ? " active" : ""}`}
-                onClick={() => onSelect(item.id)}
+                onClick={(event) => {
+                  // Giữ Ctrl/Cmd/Shift/chuột giữa để mở module ở tab trình duyệt mới.
+                  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  onSelect(item.id);
+                }}
               >
                 <NavIcon item={item} />
                 <span className="nav-text">{item.label}</span>
-              </button>
+              </a>
             ))}
           </div>
         ))}

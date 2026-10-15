@@ -3,10 +3,10 @@ import { useData } from "../store/DataContext.jsx";
 import { useDrawer } from "../components/Drawer.jsx";
 import { usePersistentState } from "../store/persistentState.js";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
+import DataTable from "../components/table/DataTable.jsx";
 import { money, randomId } from "../lib/format.js";
 
 const MAX_ROWS = 150; // chỉ vẽ 150 dòng đầu cho mượt với dữ liệu lớn
-const SORT_COLUMNS = [["id", "ID"], ["ten_sp", "Tên SP"], ["model", "Model"], ["ncc", "NCC"], ["gia_ban", "Giá bán"]];
 const ADD_BUTTON_STYLE = { padding: "0 12px", fontSize: 20, borderRadius: 8, height: 32, display: "flex", alignItems: "center", justifyContent: "center" };
 const READONLY = { background: "var(--soft)" };
 
@@ -51,6 +51,19 @@ export default function ProductsTab() {
   const toggleSort = (col) => setSort((current) => (current.col === col ? { col, asc: !current.asc } : { col, asc: true }));
   const openForm = (id) => openProductForm(drawer, requireAdmin, id);
 
+  // Bấm tiêu đề cột để sắp xếp (như cũ).
+  const sortable = (col) => ({
+    headerProps: { onClick: () => toggleSort(col), style: { cursor: "pointer", userSelect: "none" } },
+    headerExtra: <> <span>{sort.col === col ? (sort.asc ? "▲" : "▼") : ""}</span></>
+  });
+  const columns = [
+    { key: "id", label: "ID", ...sortable("id"), className: "mono", render: (item) => <Highlight text={item.id} query={search} /> },
+    { key: "ten_sp", label: "Tên SP", ...sortable("ten_sp"), style: { fontWeight: 600, color: "var(--text-main)" }, render: (item) => <Highlight text={item.ten_sp} query={search} /> },
+    { key: "model", label: "Model", ...sortable("model"), render: (item) => <Highlight text={item.model} query={search} /> },
+    { key: "ncc", label: "NCC", ...sortable("ncc"), render: (item) => <Highlight text={item.ncc} query={search} /> },
+    { key: "gia_ban", label: "Giá bán", ...sortable("gia_ban"), align: "right", render: (item) => <strong style={{ color: "var(--brand)" }}>{money(item.gia_ban)}</strong> }
+  ];
+
   return (
     <div className="card panel">
       <div className="toolbar" style={{ alignItems: "flex-end" }}>
@@ -79,32 +92,16 @@ export default function ProductsTab() {
           <button className="btn btn-secondary" type="button" onClick={() => { setSearch(""); setNccText(""); }}>Bỏ lọc</button>
         </div>
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr>
-            {SORT_COLUMNS.map(([col, label]) => (
-              <th key={col} style={{ cursor: "pointer", userSelect: "none", textAlign: col === "gia_ban" ? "right" : undefined }} onClick={() => toggleSort(col)}>
-                {label} <span>{sort.col === col ? (sort.asc ? "▲" : "▼") : ""}</span>
-              </th>
-            ))}
-          </tr></thead>
-          <tbody>
-            {!rows.length && <tr><td colSpan="5" className="empty">Không tìm thấy sản phẩm.</td></tr>}
-            {rows.slice(0, MAX_ROWS).map((item, index) => (
-              <tr key={`${item.id}-${index}`} data-action="view-product" style={{ cursor: "pointer" }} onDoubleClick={() => openProductDrawer(drawer, data, item.id)}>
-                <td className="mono"><Highlight text={item.id} query={search} /></td>
-                <td style={{ fontWeight: 600, color: "var(--text-main)" }}><Highlight text={item.ten_sp} query={search} /></td>
-                <td><Highlight text={item.model} query={search} /></td>
-                <td><Highlight text={item.ncc} query={search} /></td>
-                <td><strong style={{ color: "var(--brand)" }}>{money(item.gia_ban)}</strong></td>
-              </tr>
-            ))}
-            {rows.length > MAX_ROWS && (
-              <tr><td colSpan="5" style={{ textAlign: "center", padding: 12, color: "var(--muted)", fontSize: 13, background: "#f9fafb" }}>... và <strong>{rows.length - MAX_ROWS}</strong> sản phẩm khác (Hãy lọc chi tiết hơn)</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        id="products"
+        name="Sản phẩm"
+        columns={columns}
+        rows={rows.slice(0, MAX_ROWS)}
+        rowKey={(item, index) => `${item.id}-${index}`}
+        rowProps={(item) => ({ "data-action": "view-product", style: { cursor: "pointer" }, onDoubleClick: () => openProductDrawer(drawer, data, item.id) })}
+        empty="Không tìm thấy sản phẩm."
+        after={rows.length > MAX_ROWS && <>... và <strong>{rows.length - MAX_ROWS}</strong> sản phẩm khác (Hãy lọc chi tiết hơn)</>}
+      />
     </div>
   );
 }

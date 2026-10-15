@@ -6,6 +6,7 @@ import { showBusyToast, hideToast } from "../components/Toast.jsx";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
 import { readWorkbook, excelSerialToDate, toAmount } from "../lib/excel.js";
 import { money, formatDateVi, parseDateSort, randomId } from "../lib/format.js";
+import DataTable from "../components/table/DataTable.jsx";
 
 const MAX_ROWS = 150;
 const EMPTY_PICK = { text: "", value: "" };
@@ -177,35 +178,28 @@ export default function OrderDetailsTab() {
           <button className="btn btn-secondary" type="button" onClick={() => setFilters(EMPTY_FILTERS)}>Bỏ lọc</button>
         </div>
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead><tr><th>ID đơn hàng</th><th>Ngày</th><th>Nhà phân phối</th><th>ID nhân viên</th><th>ID sản phẩm</th><th>Loại SP</th><th style={{ textAlign: "right" }}>Đơn giá</th><th style={{ textAlign: "center" }}>Số lượng</th><th style={{ textAlign: "right" }}>Thành tiền</th></tr></thead>
-          <tbody>
-            {!rows.length && <tr><td colSpan="9" className="empty">Không tìm thấy chi tiết đơn hàng.</td></tr>}
-            {rows.slice(0, MAX_ROWS).map((item, index) => (
-              <tr key={`${item.id}-${index}`} data-action="view-order-detail" style={{ cursor: "pointer" }} onDoubleClick={() => openOrderDrawer(drawer, data, item.id_dh)}>
-                <td className="mono"><span className="badge" style={{ background: "#e0f2fe", color: "#0284c7" }}>{item.id_dh}</span></td>
-                <td>{formatDateVi(item.ngay)}</td>
-                <td>{labelWithName(item.npp, customerName(item.npp))}</td>
-                <td>{staffName(item.id_nv) || item.id_nv}</td>
-                <td style={{ fontWeight: 600, color: "var(--text)" }}>{labelWithName(item.id_sp, productName(item.id_sp))}</td>
-                <td><span className="badge" style={{ background: "#f1f5f9", color: "#475569" }}>{item.sp_chinh_thuong || "-"}</span></td>
-                <td style={{ textAlign: "right" }}>{money(item.don_gia)}</td>
-                <td style={{ textAlign: "center" }}>{item.slg}</td>
-                <td style={{ textAlign: "right" }}><strong style={{ color: "var(--brand)" }}>{money(item.thanh_tien)}</strong></td>
-              </tr>
-            ))}
-            {rows.length > MAX_ROWS && (
-              <tr><td colSpan="9" style={{ textAlign: "center", padding: 12, color: "var(--muted)", fontSize: 13, background: "#f9fafb" }}>... và <strong>{rows.length - MAX_ROWS}</strong> dòng khác (Hãy lọc chi tiết hơn)</td></tr>
-            )}
-          </tbody>
-          <tfoot style={{ fontWeight: "bold", background: "#f8fafc" }}>
-            {rows.length > 0 && (
-              <tr><td colSpan="7" style={{ textAlign: "right" }}><strong>TỔNG CỘNG:</strong></td><td style={{ textAlign: "center", color: "var(--brand)" }}>{sumQty}</td><td style={{ textAlign: "right", color: "var(--brand)" }}>{money(sumTotal)}</td></tr>
-            )}
-          </tfoot>
-        </table>
-      </div>
+      <DataTable
+        id="order-details"
+        name="Đơn hàng chi tiết"
+        columns={[
+          { key: "id_dh", label: "ID đơn hàng", className: "mono", render: (item) => <span className="badge" style={{ background: "#e0f2fe", color: "#0284c7" }}>{item.id_dh}</span> },
+          { key: "ngay", label: "Ngày", render: (item) => formatDateVi(item.ngay) },
+          { key: "npp", label: "Nhà phân phối", render: (item) => labelWithName(item.npp, customerName(item.npp)) },
+          { key: "id_nv", label: "ID nhân viên", render: (item) => staffName(item.id_nv) || item.id_nv },
+          { key: "id_sp", label: "ID sản phẩm", style: { fontWeight: 600, color: "var(--text)" }, render: (item) => labelWithName(item.id_sp, productName(item.id_sp)) },
+          { key: "loai_sp", label: "Loại SP", render: (item) => <span className="badge" style={{ background: "#f1f5f9", color: "#475569" }}>{item.sp_chinh_thuong || "-"}</span> },
+          { key: "don_gia", label: "Đơn giá", align: "right", render: (item) => money(item.don_gia) },
+          { key: "slg", label: "Số lượng", align: "center", render: (item) => item.slg, footer: sumQty, footerStyle: { color: "var(--brand)" } },
+          { key: "thanh_tien", label: "Thành tiền", align: "right", render: (item) => <strong style={{ color: "var(--brand)" }}>{money(item.thanh_tien)}</strong>, footer: money(sumTotal), footerStyle: { color: "var(--brand)" } }
+        ]}
+        rows={rows.slice(0, MAX_ROWS)}
+        rowKey={(item, index) => `${item.id}-${index}`}
+        rowProps={(item) => ({ "data-action": "view-order-detail", style: { cursor: "pointer" }, onDoubleClick: () => openOrderDrawer(drawer, data, item.id_dh) })}
+        empty="Không tìm thấy chi tiết đơn hàng."
+        after={rows.length > MAX_ROWS && <>... và <strong>{rows.length - MAX_ROWS}</strong> dòng khác (Hãy lọc chi tiết hơn)</>}
+        footerLabel={<strong>TỔNG CỘNG:</strong>}
+        tfootStyle={{ fontWeight: "bold", background: "#f8fafc" }}
+      />
     </div>
   );
 }
@@ -234,37 +228,23 @@ function OrderDetail({ orderId }) {
         <div className="field"><label>Nhà phân phối</label><input value={labelWithName(first.npp || "", customerName(first.npp || ""))} readOnly style={readonly} /></div>
         <div className="field"><label>ID nhân viên</label><input value={first.id_nv || ""} readOnly style={readonly} /></div>
       </div>
-      <div className="table-wrap" style={{ border: "1px solid var(--line)", borderRadius: 10 }}>
-        <table style={{ minWidth: "100%" }}>
-          <thead>
-            <tr>
-              <th>ID sản phẩm</th>
-              <th>Loại SP</th>
-              <th style={{ textAlign: "right" }}>Đơn giá</th>
-              <th style={{ textAlign: "center" }}>Số lượng</th>
-              <th style={{ textAlign: "right" }}>Thành tiền</th>
-            </tr>
-          </thead>
-          <tbody>
-            {details.map((item, index) => (
-              <tr key={`${item.id}-${index}`}>
-                <td className="mono">{labelWithName(item.id_sp, productName(item.id_sp))}</td>
-                <td>{item.sp_chinh_thuong || "-"}</td>
-                <td style={{ textAlign: "right" }}>{money(item.don_gia)}</td>
-                <td style={{ textAlign: "center" }}>{item.slg}</td>
-                <td style={{ textAlign: "right" }}><strong>{money(item.thanh_tien)}</strong></td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot style={{ fontWeight: 800, background: "#f8fafc" }}>
-            <tr>
-              <td colSpan="3" style={{ textAlign: "right" }}>Tổng cộng</td>
-              <td style={{ textAlign: "center", color: "var(--brand)" }}>{totalQty}</td>
-              <td style={{ textAlign: "right", color: "var(--brand)" }}>{money(totalMoney)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
+      <DataTable
+        id="order-detail-items"
+        name="Sản phẩm trong đơn"
+        columns={[
+          { key: "id_sp", label: "ID sản phẩm", className: "mono", render: (item) => labelWithName(item.id_sp, productName(item.id_sp)) },
+          { key: "loai_sp", label: "Loại SP", render: (item) => item.sp_chinh_thuong || "-" },
+          { key: "don_gia", label: "Đơn giá", align: "right", render: (item) => money(item.don_gia) },
+          { key: "slg", label: "Số lượng", align: "center", render: (item) => item.slg, footer: totalQty, footerStyle: { color: "var(--brand)" } },
+          { key: "thanh_tien", label: "Thành tiền", align: "right", render: (item) => <strong>{money(item.thanh_tien)}</strong>, footer: money(totalMoney), footerStyle: { color: "var(--brand)" } }
+        ]}
+        rows={details}
+        rowKey={(item, index) => `${item.id}-${index}`}
+        footerLabel="Tổng cộng"
+        wrapStyle={{ border: "1px solid var(--line)", borderRadius: 10 }}
+        tableStyle={{ minWidth: "100%" }}
+        tfootStyle={{ fontWeight: 800, background: "#f8fafc" }}
+      />
     </div>
   );
 }

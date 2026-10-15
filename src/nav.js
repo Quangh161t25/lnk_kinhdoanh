@@ -1,13 +1,21 @@
 export const NAV_ITEMS = [
-  { id: "dashboard", label: "Trang chủ", subtitle: "Tổng quan", icon: "home", color: "#2d5bff" },
-  { id: "sales_dashboard", label: "Dashboard kinh doanh", subtitle: "Kinh doanh", icon: "chart", color: "#ff7a1a" },
-  { id: "order_details", label: "Đơn hàng chi tiết", subtitle: "Kinh doanh", icon: "file", color: "#0ea5e9" },
-  { id: "products", label: "Sản phẩm", subtitle: "Kinh doanh", icon: "box", color: "#8f53ff" },
-  { id: "customers", label: "Khách hàng", subtitle: "Kinh doanh", icon: "users", color: "#00b894" },
-  { id: "debts", label: "Công nợ", subtitle: "Kinh doanh", icon: "coin", color: "#ff4d6d" },
-  { id: "thuong", label: "Thưởng nhân viên", subtitle: "Kinh doanh", icon: "gift", color: "#e11d48" },
-  { id: "ti_trong", label: "Tỉ trọng", subtitle: "Kinh doanh", icon: "chart", color: "#6366f1" }
+  { id: "dashboard", path: "/", label: "Trang chủ", subtitle: "Tổng quan", icon: "home", color: "#2d5bff" },
+  { id: "sales_dashboard", path: "/dashboard", label: "Dashboard kinh doanh", subtitle: "Kinh doanh", icon: "chart", color: "#ff7a1a" },
+  { id: "order_details", path: "/don-hang", label: "Đơn hàng chi tiết", subtitle: "Kinh doanh", icon: "file", color: "#0ea5e9" },
+  { id: "products", path: "/san-pham", label: "Sản phẩm", subtitle: "Kinh doanh", icon: "box", color: "#8f53ff" },
+  { id: "customers", path: "/khach-hang", label: "Khách hàng", subtitle: "Kinh doanh", icon: "users", color: "#00b894" },
+  { id: "debts", path: "/cong-no", label: "Công nợ", subtitle: "Kinh doanh", icon: "coin", color: "#ff4d6d" },
+  { id: "thuong", path: "/thuong-nhan-vien", label: "Thưởng nhân viên", subtitle: "Kinh doanh", icon: "gift", color: "#e11d48" },
+  { id: "ti_trong", path: "/ti-trong", label: "Tỉ trọng", subtitle: "Kinh doanh", icon: "chart", color: "#6366f1" }
 ];
+
+// Tab ứng với đường dẫn trên thanh địa chỉ (bỏ dấu / ở cuối); không khớp thì về Trang chủ.
+export function tabFromPath(pathname) {
+  const clean = "/" + String(pathname || "/").replace(/^\/+|\/+$/g, "");
+  return (NAV_ITEMS.find((item) => item.path === clean) || NAV_ITEMS[0]).id;
+}
+
+export const pathOfTab = (tabId) => (NAV_ITEMS.find((item) => item.id === tabId) || NAV_ITEMS[0]).path;
 
 // Mã SVG tĩnh của từng biểu tượng menu.
 export const NAV_ICONS = {

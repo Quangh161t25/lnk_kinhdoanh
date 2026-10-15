@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api.js";
 
 const FEATURES = [
@@ -13,6 +13,8 @@ export default function LoginScreen({ checking, onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => { document.title = "Đăng nhập · Lock&King"; }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();

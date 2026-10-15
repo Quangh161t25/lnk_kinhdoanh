@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from "react";
-import { NAV_ITEMS } from "../nav.js";
+import { NAV_ITEMS, pathOfTab, tabFromPath } from "../nav.js";
 import { TABS } from "../tabs/index.js";
 import { DataProvider, useData } from "../store/DataContext.jsx";
 import { DrawerProvider } from "./Drawer.jsx";
@@ -28,7 +28,8 @@ const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
 
 function Shell({ user, onLogout }) {
   const { syncMeta, reload } = useData();
-  const [activeTab, setActiveTab] = useState("dashboard");
+  // Tab đang mở lấy từ thanh địa chỉ, ví dụ /cong-no → Công nợ (tải lại trang vẫn giữ nguyên tab).
+  const [activeTab, setActiveTab] = useState(() => tabFromPath(window.location.pathname));
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -43,10 +44,27 @@ function Shell({ user, onLogout }) {
   };
 
   const selectTab = (tabId) => {
+    const path = pathOfTab(tabId);
+    if (window.location.pathname !== path) window.history.pushState({ tab: tabId }, "", path);
     setActiveTab(tabId);
     setMobileOpen(false);
     window.scrollTo({ top: 0 });
   };
+
+  // Nút Quay lại / Tiến tới của trình duyệt.
+  useEffect(() => {
+    const onPopState = () => setActiveTab(tabFromPath(window.location.pathname));
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  // Đường dẫn lạ (ví dụ /abc) thì chuyển về đường dẫn chuẩn của tab; tiêu đề tab trình duyệt theo module.
+  useEffect(() => {
+    const path = pathOfTab(activeTab);
+    if (window.location.pathname !== path) window.history.replaceState({ tab: activeTab }, "", path);
+    const label = (NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0]).label;
+    document.title = `${label} · Lock&King`;
+  }, [activeTab]);
 
   useEffect(() => {
     if (!mobileOpen) return;
