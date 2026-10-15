@@ -1,9 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { showToast } from "./Toast.jsx";
 
-export default function Topbar({ title, subtitle, user, onToggleSidebar, onChangePassword, onLogout }) {
+// Chữ cái đầu của từ đầu và từ cuối trong tên, ví dụ "Nguyễn Văn An" → "NA".
+const getInitials = (name) => {
+  const words = String(name || "U").trim().split(/\s+/);
+  return ((words[0]?.[0] || "") + (words.length > 1 ? words[words.length - 1][0] : words[0]?.[1] || "")).toUpperCase();
+};
+
+export default function Topbar({ title, subtitle, user, onToggleSidebar, onChangePassword, onLogout, onReload }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const wrapRef = useRef(null);
+
+  async function handleReload() {
+    setReloading(true);
+    try {
+      await onReload();
+      showToast("Đã tải lại dữ liệu từ Google Sheets.");
+    } catch (error) {
+      showToast(error.message || "Không tải lại được dữ liệu.", true);
+    } finally {
+      setReloading(false);
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -13,25 +32,34 @@ export default function Topbar({ title, subtitle, user, onToggleSidebar, onChang
   }, [menuOpen]);
 
   const displayName = user?.ho_ten || user?.id || "Chưa đăng nhập";
-  const role = user?.quyen === "admin" ? "admin" : (user?.quyen || "user");
-  const initials = (displayName || "U").trim().slice(0, 2).toUpperCase();
+  const role = user?.quyen === "admin" ? "Quản trị viên" : (user?.chuc_vu || "Nhân viên");
+  const initials = getInitials(displayName);
   const pick = (action) => () => { setMenuOpen(false); action(); };
   const notReady = () => showToast("Chức năng đang phát triển");
 
   return (
     <header className="topbar">
       <div className="page-head">
-        <button className="menu-toggle" type="button" title="Đóng/Mở menu" onClick={onToggleSidebar}>
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="menu-toggle" type="button" title="Đóng/Mở menu" aria-label="Đóng/Mở menu" onClick={onToggleSidebar}>
+          <svg className="icon-chevron" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 6L9 12L15 18" />
+          </svg>
+          <svg className="icon-menu" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
         <div>
+          <p className="page-crumb">{subtitle}</p>
           <h1>{title}</h1>
-          <p>{subtitle}</p>
         </div>
       </div>
       <div className="topbar-right">
+        {onReload && (
+          <button type="button" className={`topbar-icon-btn${reloading ? " spinning" : ""}`} title="Tải lại dữ liệu từ Google Sheets"
+            aria-label="Tải lại dữ liệu" onClick={handleReload} disabled={reloading}>
+            <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></svg>
+          </button>
+        )}
         <div className="user-menu-wrap" ref={wrapRef}>
           <button type="button" className="user-menu-toggle" onClick={() => setMenuOpen((open) => !open)}>
             <div className="user-avatar">
@@ -53,7 +81,7 @@ export default function Topbar({ title, subtitle, user, onToggleSidebar, onChang
                 <strong>{displayName}</strong>
                 <small>{role}</small>
               </div>
-              <div style={{ padding: "6px 0" }}>
+              <div>
                 <button className="user-menu-item" type="button" onClick={pick(notReady)}>
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
                   Hồ sơ cá nhân

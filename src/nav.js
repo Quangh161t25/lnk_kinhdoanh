@@ -1,12 +1,12 @@
 export const NAV_ITEMS = [
-  { id: "dashboard", label: "Trang chủ", subtitle: "MENU CHÍNH", icon: "home", color: "#2d5bff" },
-  { id: "sales_dashboard", label: "Dashboard Kinh doanh", subtitle: "KINH DOANH", icon: "chart", color: "#ff7a1a" },
-  { id: "order_details", label: "Đơn hàng Chi tiết", subtitle: "KINH DOANH", icon: "file", color: "#0ea5e9" },
-  { id: "products", label: "Danh sách Sản phẩm", subtitle: "KINH DOANH", icon: "box", color: "#8f53ff" },
-  { id: "customers", label: "Khách hàng", subtitle: "KINH DOANH", icon: "users", color: "#00b894" },
-  { id: "debts", label: "Công nợ", subtitle: "KINH DOANH", icon: "coin", color: "#ff4d6d" },
-  { id: "thuong", label: "Thưởng Nhân Viên", subtitle: "KINH DOANH", icon: "gift", color: "#e11d48" },
-  { id: "ti_trong", label: "TỈ TRỌNG", subtitle: "KINH DOANH", icon: "chart", color: "#6366f1" }
+  { id: "dashboard", label: "Trang chủ", subtitle: "Tổng quan", icon: "home", color: "#2d5bff" },
+  { id: "sales_dashboard", label: "Dashboard kinh doanh", subtitle: "Kinh doanh", icon: "chart", color: "#ff7a1a" },
+  { id: "order_details", label: "Đơn hàng chi tiết", subtitle: "Kinh doanh", icon: "file", color: "#0ea5e9" },
+  { id: "products", label: "Sản phẩm", subtitle: "Kinh doanh", icon: "box", color: "#8f53ff" },
+  { id: "customers", label: "Khách hàng", subtitle: "Kinh doanh", icon: "users", color: "#00b894" },
+  { id: "debts", label: "Công nợ", subtitle: "Kinh doanh", icon: "coin", color: "#ff4d6d" },
+  { id: "thuong", label: "Thưởng nhân viên", subtitle: "Kinh doanh", icon: "gift", color: "#e11d48" },
+  { id: "ti_trong", label: "Tỉ trọng", subtitle: "Kinh doanh", icon: "chart", color: "#6366f1" }
 ];
 
 // Mã SVG tĩnh của từng biểu tượng menu.

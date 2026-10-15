@@ -1,4 +1,4 @@
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { NAV_ITEMS } from "../nav.js";
 import { TABS } from "../tabs/index.js";
 import { DataProvider, useData } from "../store/DataContext.jsx";
@@ -24,25 +24,44 @@ export default function MainApp({ user: initialUser, staff, onLogout }) {
   );
 }
 
+const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
+
 function Shell({ user, onLogout }) {
-  const { syncMeta } = useData();
+  const { syncMeta, reload } = useData();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Màn hình nhỏ: nút menu mở/đóng ngăn kéo. Màn hình lớn: thu gọn/mở rộng sidebar.
   const toggleSidebar = () => {
+    if (isMobile()) return setMobileOpen((open) => !open);
     setCollapsed((value) => {
       try { localStorage.setItem("sidebar_collapsed", value ? "0" : "1"); } catch { }
       return !value;
     });
   };
 
+  const selectTab = (tabId) => {
+    setActiveTab(tabId);
+    setMobileOpen(false);
+    window.scrollTo({ top: 0 });
+  };
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (event) => { if (event.key === "Escape") setMobileOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
   const meta = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
   const ActiveTab = TABS[meta.id];
 
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}`}>
-      <Sidebar activeTab={meta.id} onSelect={setActiveTab} syncMeta={syncMeta} />
+    <div className={`app${collapsed ? " collapsed" : ""}${mobileOpen ? " mobile-open" : ""}`}>
+      <Sidebar activeTab={meta.id} onSelect={selectTab} syncMeta={syncMeta} />
+      <div className="sidebar-backdrop" onClick={() => setMobileOpen(false)} />
       <div className="main">
         <Topbar
           title={meta.label}
@@ -51,9 +70,14 @@ function Shell({ user, onLogout }) {
           onToggleSidebar={toggleSidebar}
           onChangePassword={() => setChangingPassword(true)}
           onLogout={onLogout}
+          onReload={reload}
         />
         <main className="content">
-          <section id={meta.id} className="section active"><Suspense fallback={null}><ActiveTab /></Suspense></section>
+          <section id={meta.id} className="section active" key={meta.id}>
+            <Suspense fallback={<div className="loading-box"><div className="spinner"></div></div>}>
+              <ActiveTab onNavigate={selectTab} />
+            </Suspense>
+          </section>
         </main>
       </div>
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
