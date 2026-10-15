@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { requiredEnv } from "./http.js";
+import { requiredEnv, ConfigError } from "./http.js";
 import * as mock from "./mock.js";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -10,19 +10,47 @@ const useMock = () => process.env.MOCK_SHEETS === "1" && !process.env.VERCEL;
 
 let tokenCache = { token: "", expiresAt: 0 };
 
+const stripQuotes = (value) => value.replace(/^(['"])([\s\S]*)\1$/, "$2").trim();
+
+// Chấp nhận cả 3 cách dán: chuỗi có "\n", chuỗi nhiều dòng, hoặc dán nguyên file JSON của service account.
+function serviceAccount() {
+  let key = stripQuotes(requiredEnv("GOOGLE_PRIVATE_KEY"));
+  let email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL ? stripQuotes(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL.trim()) : "";
+  if (key.startsWith("{")) {
+    try {
+      const json = JSON.parse(key);
+      key = json.private_key || "";
+      email ||= json.client_email || "";
+    } catch {
+      throw new ConfigError("GOOGLE_PRIVATE_KEY trông giống file JSON nhưng không đọc được. Hãy dán riêng giá trị private_key.");
+    }
+  }
+  key = key.replace(/\\n/g, "\n").replace(/\r/g, "");
+  if (!/-----BEGIN PRIVATE KEY-----[\s\S]+-----END PRIVATE KEY-----/.test(key)) {
+    throw new ConfigError("GOOGLE_PRIVATE_KEY không đúng định dạng: phải bắt đầu bằng -----BEGIN PRIVATE KEY----- và kết thúc bằng -----END PRIVATE KEY-----.");
+  }
+  if (!email) requiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
+  return { key, email };
+}
+
+// Cho phép dán cả URL của Google Sheet thay vì chỉ ID.
+function spreadsheetId() {
+  const raw = stripQuotes(requiredEnv("SPREADSHEET_ID"));
+  return /\/d\/([a-zA-Z0-9_-]+)/.exec(raw)?.[1] || raw;
+}
+
 async function getAccessToken() {
   if (tokenCache.token && Date.now() < tokenCache.expiresAt - 300000) return tokenCache.token;
+  const { key, email } = serviceAccount();
   const now = Math.floor(Date.now() / 1000);
   const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
-  const claims = Buffer.from(JSON.stringify({
-    iss: requiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL"),
-    scope: SCOPE,
-    aud: TOKEN_URL,
-    iat: now,
-    exp: now + 3600
-  })).toString("base64url");
-  const privateKey = requiredEnv("GOOGLE_PRIVATE_KEY").replace(/\\n/g, "\n");
-  const signature = crypto.sign("RSA-SHA256", Buffer.from(`${header}.${claims}`), privateKey).toString("base64url");
+  const claims = Buffer.from(JSON.stringify({ iss: email, scope: SCOPE, aud: TOKEN_URL, iat: now, exp: now + 3600 })).toString("base64url");
+  let signature;
+  try {
+    signature = crypto.sign("RSA-SHA256", Buffer.from(`${header}.${claims}`), key).toString("base64url");
+  } catch {
+    throw new ConfigError("GOOGLE_PRIVATE_KEY không hợp lệ (không ký được). Hãy dán lại đúng private key của service account.");
+  }
 
   const response = await fetch(TOKEN_URL, {
     method: "POST",
@@ -32,22 +60,40 @@ async function getAccessToken() {
       assertion: `${header}.${claims}.${signature}`
     })
   });
-  const data = await response.json();
-  if (!data.access_token) throw new Error(data.error_description || data.error || "Không lấy được access token.");
+  const data = await response.json().catch(() => ({}));
+  if (!data.access_token) {
+    const reason = data.error_description || data.error || `HTTP ${response.status}`;
+    throw new ConfigError(`Google từ chối service account (${reason}). Kiểm tra GOOGLE_SERVICE_ACCOUNT_EMAIL có khớp với key, và key chưa bị xóa.`);
+  }
   tokenCache = { token: data.access_token, expiresAt: Date.now() + Number(data.expires_in || 3600) * 1000 };
   return tokenCache.token;
 }
 
+function explainSheetsError(status, message) {
+  if (status === 403) return `Service account không có quyền với spreadsheet (${message}). Hãy Share sheet cho email service account với quyền Editor, và bật Google Sheets API trong Google Cloud.`;
+  if (status === 404) return "Không tìm thấy spreadsheet. Kiểm tra lại SPREADSHEET_ID.";
+  return `Google Sheets trả về lỗi: ${message}`;
+}
+
 async function sheetsRequest(path, init = {}) {
   const token = await getAccessToken();
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(requiredEnv("SPREADSHEET_ID"))}${path}`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId())}${path}`;
   const response = await fetch(url, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok || data.error) throw new Error(data.error?.message || `Google Sheets trả về lỗi ${response.status}`);
+  if (!response.ok || data.error) {
+    throw new ConfigError(explainSheetsError(response.status, data.error?.message || `HTTP ${response.status}`));
+  }
   return data;
+}
+
+// Danh sách tên các tab trong spreadsheet (dùng cho /api/health).
+export async function listSheetTitles() {
+  if (useMock()) return Object.keys(mock.all());
+  const data = await sheetsRequest("?fields=sheets.properties.title");
+  return (data.sheets || []).map((sheet) => sheet.properties.title);
 }
 
 const rangePath = (range) => `/values/${encodeURIComponent(range)}`;

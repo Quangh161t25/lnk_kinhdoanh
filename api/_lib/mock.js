@@ -28,3 +28,7 @@ export function updateCell(sheetName, cell, value) {
   while (sheet[row].length <= col) sheet[row].push("");
   sheet[row][col] = value;
 }
+
+export function all() {
+  return getStore();
+}

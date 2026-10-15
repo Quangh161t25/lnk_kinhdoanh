@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { AUTH_SHEET } from "../../shared/schema.js";
-import { HttpError } from "./http.js";
+import { HttpError, ConfigError } from "./http.js";
 import { readSheet } from "./sheets.js";
 
 const COOKIE_NAME = "lk_session";
@@ -53,7 +53,7 @@ export const passwordCell = (user) => `${PASSWORD_COLUMN}${user.rowNumber}`;
 
 function sessionSecret() {
   const secret = process.env.SESSION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("SESSION_SECRET chưa cấu hình hoặc ngắn hơn 32 ký tự.");
+  if (!secret || secret.trim().length < 32) throw new ConfigError("SESSION_SECRET chưa cấu hình trên Vercel hoặc ngắn hơn 32 ký tự.");
   return secret;
 }
 

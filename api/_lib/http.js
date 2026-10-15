@@ -5,6 +5,14 @@ export class HttpError extends Error {
   }
 }
 
+// Lỗi cấu hình (thiếu/sai biến môi trường) hoặc lỗi từ Google: báo rõ nguyên nhân
+// thay vì "Lỗi máy chủ" chung chung, để biết cần sửa gì trên Vercel.
+export class ConfigError extends HttpError {
+  constructor(message) {
+    super(500, message);
+  }
+}
+
 // Bọc handler: kiểm tra method, chặn cache và trả lỗi dạng JSON thống nhất.
 export function route(method, handler) {
   return async (req, res) => {
@@ -18,7 +26,8 @@ export function route(method, handler) {
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
       if (status === 500) console.error(error);
-      res.status(status).json({ error: status === 500 ? "Lỗi máy chủ, vui lòng thử lại." : error.message });
+      const known = error instanceof HttpError;
+      res.status(status).json({ error: known ? error.message : "Lỗi máy chủ, vui lòng thử lại." });
     }
   };
 }
@@ -34,6 +43,6 @@ export function getBody(req) {
 
 export function requiredEnv(name) {
   const value = process.env[name];
-  if (!value) throw new Error(`Thiếu biến môi trường ${name}`);
-  return value;
+  if (!value || !value.trim()) throw new ConfigError(`Chưa cấu hình biến môi trường ${name} trên Vercel (hoặc chưa Redeploy sau khi thêm).`);
+  return value.trim();
 }
