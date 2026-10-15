@@ -6,7 +6,8 @@ export const SHEETS = {
   DH_CT: ["id", "id_dh", "ngay", "npp", "id_nv", "id_sp", "don_gia", "slg", "thanh_tien", "ncc", "sp_chinh_thuong"],
   KPI: ["id", "thang", "id_nv", "ds_chinh", "ds_thuong", "tien_thuong_ds_chinh", "tien_thuong_ds_thuong", "tien_thuong_ds", "ti_le_thu_con_no", "tong_tien_thuong", "tong_tien_thuong_thuc"],
   CONG_NO: ["id", "ngay", "id_khach_hang", "id_dh", "thu_chi", "so_tien", "cong_no", "id_nv"],
-  DK_THUONG: ["id", "thang", "id_nv", "loai", "muc_tu", "muc_den", "gia_tri", "kieu", "ghi_chu"]
+  // moc_vuot (cột J): mốc tính "phần vượt" cho kiểu phantram_vuot; để trống thì dùng muc_tu.
+  DK_THUONG: ["id", "thang", "id_nv", "loai", "muc_tu", "muc_den", "gia_tri", "kieu", "ghi_chu", "moc_vuot"]
 };
 
 // Sheet tài khoản. Chỉ API được đọc/ghi, không bao giờ gửi nguyên sheet này ra trình duyệt.

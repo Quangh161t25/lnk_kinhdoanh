@@ -5,7 +5,13 @@ import { currentYearMonth, normalizeBonusKey, normalizeMonthKey, normalizeProduc
 const SPECIAL_NV = "Lê Quang Tuyến";
 const SPECIAL_TEAM = ["ngô tuấn anh", "trần doãn sáng", "kiều trung đức", "vũ công tâm", "đoàn văn quang"];
 
-const lower = (value) => String(value || "").trim().toLowerCase();
+// Nguyễn Thị Nguyệt nhận 0,05% tổng doanh số SP chính + SP thường của mọi mã NV
+// trong DH_CT (kể cả Công ty Vũ Gia), trừ Lê Quang Tuyến.
+const NGUYET_NV = "Nguyễn Thị Nguyệt";
+const NGUYET_RATE = 0.0005;
+
+const lower = (value) => String(value || "").normalize("NFC").trim().toLowerCase();
+const MANAGERS = [lower(SPECIAL_NV), lower(NGUYET_NV)];
 
 // Tháng "yyyy-mm" của một ngày (chấp nhận cả tháng chưa có số 0 đứng trước).
 const monthOf = (dateStr) => {
@@ -21,9 +27,11 @@ const monthOf = (dateStr) => {
   return "";
 };
 
-// Tra điều kiện thưởng trong DK_THUONG. Các rule khớp được cộng dồn; với mỗi kiểu,
-// nếu có rule riêng cho nhân viên thì bỏ rule chung cùng kiểu.
-// Kiểu: "phan_tram" (% trên doanh số), "phan_tram_vuot" (% phần vượt muc_tu), "khong", còn lại = cố định.
+// Tra điều kiện thưởng trong DK_THUONG. Rule khớp khi muc_tu <= doanh số < muc_den
+// ("từ ... đến dưới ..."; muc_den trống = không giới hạn). Các rule khớp được cộng dồn;
+// với mỗi kiểu, nếu có rule riêng cho nhân viên thì bỏ rule chung cùng kiểu.
+// Kiểu: "phan_tram" (% trên toàn bộ doanh số), "phan_tram_vuot" (% phần vượt moc_vuot,
+// moc_vuot trống thì dùng muc_tu), "khong", còn lại (ví dụ "co_dinh") = số tiền cố định gia_tri.
 export function lookupBonus(rules, loai, amount, nvId, thang) {
   const targetLoai = normalizeBonusKey(loai);
   const targetThang = normalizeMonthKey(thang);
@@ -36,7 +44,7 @@ export function lookupBonus(rules, loai, amount, nvId, thang) {
     const from = parseLooseNumber(r.muc_tu);
     const to = parseLooseNumber(r.muc_den);
     if (amount < from) return false;
-    if (to > 0 && amount > to) return false;
+    if (to > 0 && amount >= to) return false;
     return true;
   });
   if (!matched.length) return 0;
@@ -52,7 +60,10 @@ export function lookupBonus(rules, loai, amount, nvId, thang) {
     if (kieu === "phantram" || kieu === "%" || kieu === "phantramtong") {
       return sum + (mucDen > 0 ? amount : mucTu) * giaTri / 100;
     }
-    if (kieu === "phantramvuot") return sum + Math.max(0, amount - mucTu) * giaTri / 100;
+    if (kieu === "phantramvuot") {
+      const mocVuot = String(rule.moc_vuot ?? "").trim() ? parseLooseNumber(rule.moc_vuot) : mucTu;
+      return sum + Math.max(0, amount - mocVuot) * giaTri / 100;
+    }
     if (kieu === "khong") return sum;
     return sum + giaTri;
   }, 0);
@@ -120,6 +131,24 @@ export function computeBonusRows(data) {
     else rows.push(specialRow);
   });
 
+  const companyRevenue = {};
+  Object.values(sales).forEach((entry) => {
+    if (lower(entry.nvId) === lower(SPECIAL_NV)) return;
+    companyRevenue[entry.thang] = (companyRevenue[entry.thang] || 0) + Number(entry.ds_chinh || 0) + Number(entry.ds_thuong || 0);
+  });
+  Object.entries(companyRevenue).forEach(([thang, revenue]) => {
+    if (revenue <= 0) return;
+    const nguyetRow = {
+      thang, nvId: NGUYET_NV, ds_chinh: 0, ds_thuong: revenue, ds_r1: 0,
+      thuong_sp_chinh: 0, thuong_sp_thuong: 0, thuong_sp_r1: 0, thuong_doanh_so: 0,
+      ti_le_thu_no: 0, no_phat_sinh: 0, no_da_thu: 0,
+      tong_tien_thuong: Math.round(revenue * NGUYET_RATE)
+    };
+    const index = rows.findIndex((row) => row.thang === thang && lower(row.nvId) === lower(NGUYET_NV));
+    if (index >= 0) rows[index] = nguyetRow;
+    else rows.push(nguyetRow);
+  });
+
   // Ngô Tuấn Anh nhận một nửa; nửa còn lại chuyển cho Vũ Công Tâm cùng tháng.
   rows.forEach((r) => {
     const id = lower(r.nvId);
@@ -133,12 +162,12 @@ export function computeBonusRows(data) {
     }
   });
 
-  // Tháng mới nhất trước, quản lý xuống cuối tháng, rồi doanh số giảm dần, rồi mã NV.
+  // Tháng mới nhất trước, hai dòng quản lý (Tuyến rồi Nguyệt) xuống cuối tháng, rồi doanh số giảm dần, rồi mã NV.
   rows.sort((a, b) => {
     if (a.thang !== b.thang) return b.thang.localeCompare(a.thang);
-    const aIsSpecial = lower(a.nvId) === "lê quang tuyến";
-    const bIsSpecial = lower(b.nvId) === "lê quang tuyến";
-    if (aIsSpecial !== bIsSpecial) return aIsSpecial ? 1 : -1;
+    const aRank = MANAGERS.indexOf(lower(a.nvId));
+    const bRank = MANAGERS.indexOf(lower(b.nvId));
+    if (aRank !== bRank) return aRank - bRank;
     const dsA = (a.ds_chinh || 0) + (a.ds_thuong || 0) + (a.ds_r1 || 0);
     const dsB = (b.ds_chinh || 0) + (b.ds_thuong || 0) + (b.ds_r1 || 0);
     if (dsB !== dsA) return dsB - dsA;
