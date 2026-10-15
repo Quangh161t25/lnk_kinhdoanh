@@ -1071,3 +1071,76 @@
   gap: 8px;
   margin-top: 24px;
 }
+
+/* ===== Các tab nghiệp vụ (trước đây chèn bằng thẻ <style> trong từng tab) ===== */
+
+tbody tr[data-action="view-customer"]:hover,
+tbody tr[data-action="view-product"]:hover,
+tbody tr[data-action="view-debt"]:hover,
+tbody tr[data-action="view-order-detail"]:hover {
+  background: var(--brand-soft);
+}
+
+.row-debt-high { background: #fff1f1; }
+.badge-status { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+.bs-paid { background: #dcfce7; color: #16a34a; }
+.bs-owe { background: #fee2e2; color: #ef4444; }
+.bs-credit { background: #e0f2fe; color: #0284c7; }
+.badge-thu { background: #dcfce7; color: #16a34a; }
+.badge-chi { background: #fee2e2; color: #ef4444; }
+
+/* Ô tìm kiếm có danh sách gợi ý (SearchDropdown) */
+.dropdown-search { position: relative; }
+.dropdown-search input { width: 100%; border: 1px solid var(--line); padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+.dropdown-menu { position: absolute; top: calc(100% + 4px); left: 0; min-width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow-y: auto; z-index: 10; display: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+.dropdown-menu.show { display: block; }
+.dropdown-item { padding: 8px 12px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.dropdown-item:hover { background: var(--brand-soft); }
+
+#products .dropdown-search input { padding: 6px 10px; border-radius: 6px; height: 32px; }
+#products mark { background: #fef08a; color: #854d0e; padding: 0 2px; border-radius: 2px; }
+#debts .dropdown-search { display: inline-block; }
+#debts .dropdown-search input { padding: 6px 10px; border-radius: 6px; }
+
+/* Chọn khách hàng trong biểu mẫu phiếu công nợ */
+.debt-form .dropdown-search input { padding: 10px; border-radius: 10px; }
+.debt-form .dropdown-menu { top: 100%; right: 0; max-height: 200px; }
+.debt-form .dropdown-item { padding: 10px 14px; white-space: normal; }
+
+/* Ô chọn nhiều (Dashboard Kinh doanh) */
+.ms-container { position: relative; min-width: 160px; font-size: 13px; font-family: inherit; }
+.ms-btn { width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 12px; height: 36px; text-align: left; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ms-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-weight: 500; }
+.ms-btn:after { content: ""; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #66789b; }
+.ms-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1); z-index: 1100; margin-top: 4px; display: none; width: max-content; min-width: 100%; }
+.ms-dropdown.show { display: block; }
+.ms-search-box { padding: 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; z-index: 1; }
+.ms-search-box input { width: 100%; border: 1px solid var(--line); padding: 6px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+.ms-options-wrap { max-height: 240px; overflow-y: auto; padding: 4px 0; }
+.ms-option { padding: 8px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; transition: background .12s; }
+.ms-option:hover { background: var(--soft); }
+.ms-option input { cursor: pointer; width: 14px; height: 14px; accent-color: var(--brand); }
+.ms-option label { cursor: pointer; flex: 1; white-space: nowrap; font-weight: 500; }
+.ms-footer { padding: 8px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; background: #fff; position: sticky; bottom: 0; }
+.ms-footer label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600; color: var(--brand); }
+.ms-footer label input { accent-color: var(--brand); width: 14px; height: 14px; }
+.ms-btn-clear { border: none; background: transparent; color: #ef4444; font-size: 12px; font-weight: 700; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
+.ms-btn-clear:hover { background: #fef2f2; }
+
+/* Thưởng nhân viên */
+.thuong-badge-full { background: #dcfce7; color: #16a34a; }
+.thuong-badge-partial { background: #fef9c3; color: #a16207; }
+.thuong-badge-none { background: #fee2e2; color: #dc2626; }
+
+/* Tỉ trọng */
+.ti-trong-dropdown { position: relative; min-width: 180px; }
+.ti-trong-dropdown input { width: 100%; border: none; outline: none; font-size: 13px; background: transparent; padding: 0; height: 100%; }
+.ti-trong-menu { position: absolute; top: calc(100% + 8px); left: -10px; right: -10px; background: #fff; border: 1px solid var(--line); border-radius: 8px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); max-height: 280px; }
+.ti-trong-menu.show { display: block; }
+.ti-trong-item { padding: 10px 14px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f5f9; transition: background 0.1s; display: flex; flex-direction: column; gap: 2px; }
+.ti-trong-item:last-child { border-bottom: none; }
+.ti-trong-item:hover { background: var(--brand-soft); }
+.ti-trong-item b { color: var(--brand); font-family: var(--mono); font-size: 12px; }
+.summary-card-wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.summary-card-inner { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
+.summary-title { font-size: 14px; font-weight: 700; color: var(--text-main); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }

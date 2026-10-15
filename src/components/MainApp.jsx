@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { NAV_ITEMS } from "../nav.js";
-import { initLegacy, startSession, endSession, showTab } from "../legacy/erp.js";
+import { TABS } from "../tabs/index.js";
+import { DataProvider, useData } from "../store/DataContext.jsx";
+import { DrawerProvider } from "./Drawer.jsx";
 import Sidebar from "./Sidebar.jsx";
 import Topbar from "./Topbar.jsx";
-import LegacyHost from "./LegacyHost.jsx";
+import Toast from "./Toast.jsx";
 import ChangePasswordModal from "./ChangePasswordModal.jsx";
 
 const readCollapsed = () => {
@@ -12,21 +14,21 @@ const readCollapsed = () => {
 
 export default function MainApp({ user: initialUser, staff, onLogout }) {
   const [user, setUser] = useState(initialUser);
+  return (
+    <DataProvider user={user} staff={staff} onUser={setUser} onUnauthorized={onLogout}>
+      <DrawerProvider>
+        <Shell user={user} onLogout={onLogout} />
+      </DrawerProvider>
+      <Toast />
+    </DataProvider>
+  );
+}
+
+function Shell({ user, onLogout }) {
+  const { syncMeta } = useData();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [syncMeta, setSyncMeta] = useState(null);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [changingPassword, setChangingPassword] = useState(false);
-
-  // Khởi động phần nghiệp vụ khi khung giao diện đã có trên trang (effect chạy sau khi DOM được tạo).
-  useEffect(() => {
-    initLegacy({ onSyncMeta: setSyncMeta });
-    startSession(initialUser, staff)
-      .then((result) => { if (result?.user) setUser(result.user); })
-      .catch((error) => { if (error.status === 401) onLogout(); });
-    return () => endSession();
-  }, []);
-
-  useEffect(() => { showTab(activeTab); }, [activeTab]);
 
   const toggleSidebar = () => {
     setCollapsed((value) => {
@@ -36,10 +38,11 @@ export default function MainApp({ user: initialUser, staff, onLogout }) {
   };
 
   const meta = NAV_ITEMS.find((item) => item.id === activeTab) || NAV_ITEMS[0];
+  const ActiveTab = TABS[meta.id];
 
   return (
     <div className={`app${collapsed ? " collapsed" : ""}`}>
-      <Sidebar activeTab={activeTab} onSelect={setActiveTab} syncMeta={syncMeta} />
+      <Sidebar activeTab={meta.id} onSelect={setActiveTab} syncMeta={syncMeta} />
       <div className="main">
         <Topbar
           title={meta.label}
@@ -49,7 +52,9 @@ export default function MainApp({ user: initialUser, staff, onLogout }) {
           onChangePassword={() => setChangingPassword(true)}
           onLogout={onLogout}
         />
-        <LegacyHost />
+        <main className="content">
+          <section id={meta.id} className="section active"><Suspense fallback={null}><ActiveTab /></Suspense></section>
+        </main>
       </div>
       {changingPassword && <ChangePasswordModal onClose={() => setChangingPassword(false)} />}
     </div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "../api.js";
-import { showToast } from "../legacy/erp.js";
+import { showToast } from "./Toast.jsx";
 
 export default function ChangePasswordModal({ onClose }) {
   const [form, setForm] = useState({ oldPassword: "", newPassword: "", confirmPassword: "" });

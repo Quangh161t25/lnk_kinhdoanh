@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { showToast } from "../legacy/erp.js";
+import { showToast } from "./Toast.jsx";
 
 export default function Topbar({ title, subtitle, user, onToggleSidebar, onChangePassword, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);

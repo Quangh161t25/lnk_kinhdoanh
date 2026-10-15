@@ -18,8 +18,10 @@ Trình duyệt (React)  ──/api/*──▶  Vercel Functions  ──▶  Goog
 | `api/` | Các endpoint: `login`, `logout`, `me`, `data`, `sheets`, `change-password` |
 | `api/_lib/` | Kết nối Google Sheets, xác thực, lọc dữ liệu theo quyền |
 | `shared/schema.js` | Tên cột các sheet (dùng chung frontend/backend) |
-| `src/components/` | Khung giao diện React: đăng nhập, sidebar, topbar, đổi mật khẩu |
-| `src/legacy/erp.js` | Logic các tab nghiệp vụ, chuyển từ `script.js` cũ |
+| `src/components/` | Khung giao diện React: đăng nhập, sidebar, topbar, đổi mật khẩu, drawer, toast, ô chọn dùng chung |
+| `src/tabs/` | Mỗi tab nghiệp vụ là một component (Trang chủ, Dashboard, Đơn hàng, Sản phẩm, Khách hàng, Công nợ, Thưởng, Tỉ trọng) |
+| `src/store/` | Kho dữ liệu dùng chung (`DataContext`), chuẩn hóa dữ liệu, ghi sheet, cache trình duyệt |
+| `src/lib/` | Hàm định dạng và các phép tính (dashboard, thưởng), đọc Excel |
 | `dev/mock-data.js` | Dữ liệu giả lập để chạy thử |
 
 ## Chạy ở máy
