@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Chart from "chart.js/auto";
 import { useData } from "../store/DataContext.jsx";
 import MultiSelect from "../components/common/MultiSelect.jsx";
-import Pagination, { paginate } from "../components/common/Pagination.jsx";
 import { computeSalesDashboard } from "../lib/salesDashboard.js";
 import { money, debtColor } from "../lib/format.js";
 import DataTable from "../components/table/DataTable.jsx";
@@ -131,12 +130,10 @@ export default function SalesDashboardTab() {
   const resetPages = () => { setKhPage(1); setSpPage(1); };
   const changeFilter = (setter) => (value) => { setter(value); resetPages(); };
 
-  const kh = paginate(stats.khRows, khPage, PAGE_SIZE);
   const term = productSearch.trim().toLowerCase();
   const products = stats.productRows
     .map((row) => ({ ...row, name: productName(row.id) }))
     .filter((row) => !term || row.id.toLowerCase().includes(term) || (row.name && String(row.name).toLowerCase().includes(term)));
-  const sp = paginate(products, spPage, PAGE_SIZE);
   const totalQty = products.reduce((sum, row) => sum + (row.slg || 0), 0);
   const totalRevenue = products.reduce((sum, row) => sum + (row.thanh_tien || 0), 0);
 
@@ -234,12 +231,15 @@ export default function SalesDashboardTab() {
             id="dash-customers"
             name="Doanh số theo khách hàng"
             columns={customerColumns}
-            rows={kh.rows}
+            rows={stats.khRows}
+            pageSize={PAGE_SIZE}
+            page={khPage}
+            onPage={setKhPage}
+            pageNoun="khách hàng"
             rowKey={(row) => row.id}
             toolbarStyle={TOOLBAR}
             tableStyle={{ minWidth: "100%" }}
           />
-          <Pagination page={kh.page} pageSize={PAGE_SIZE} totalRows={stats.khRows.length} noun="khách hàng" onPage={setKhPage} />
         </div>
 
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -252,14 +252,17 @@ export default function SalesDashboardTab() {
             id="dash-products"
             name="Danh sách sản phẩm"
             columns={productColumns}
-            rows={sp.rows}
+            rows={products}
+            pageSize={PAGE_SIZE}
+            page={spPage}
+            onPage={setSpPage}
+            pageNoun="sản phẩm"
             rowKey={(row) => row.id}
             footerLabel="Tổng cộng"
             footerRowStyle={{ background: "#f8fafc", fontWeight: 700, borderTop: "1px solid var(--line)" }}
             toolbarStyle={TOOLBAR}
             tableStyle={{ minWidth: "100%" }}
           />
-          <Pagination page={sp.page} pageSize={PAGE_SIZE} totalRows={products.length} noun="sản phẩm" onPage={setSpPage} />
         </div>
       </div>
     </>

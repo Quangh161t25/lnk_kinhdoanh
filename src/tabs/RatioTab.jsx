@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useData } from "../store/DataContext.jsx";
 import { usePersistentState } from "../store/persistentState.js";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
-import Pagination, { paginate } from "../components/common/Pagination.jsx";
 import { money, parseLooseNumber } from "../lib/format.js";
 import DataTable from "../components/table/DataTable.jsx";
 
@@ -91,7 +90,6 @@ export default function RatioTab() {
       return true;
     })
     .sort((a, b) => b.doanh_thu - a.doanh_thu);
-  const current = paginate(rows, page, PAGE_SIZE);
 
   const byStaff = {};
   rows.forEach((r) => {
@@ -186,13 +184,16 @@ export default function RatioTab() {
           id="ratio-customers"
           name="Chi tiết theo khách hàng"
           columns={RATIO_CUSTOMER_COLUMNS}
-          rows={current.rows}
+          rows={rows}
+          pageSize={PAGE_SIZE}
+          page={page}
+          onPage={setPage}
+          pageNoun="khách hàng"
           rowKey={(r, index) => `${r.id}-${index}`}
           wrapStyle={{ maxHeight: "calc(100vh - 450px)", overflow: "auto" }}
           tableStyle={{ minWidth: 1200, borderCollapse: "separate", borderSpacing: 0 }}
           theadStyle={{ position: "sticky", top: 0, zIndex: 10, background: "#f8fafc", boxShadow: "0 1px 0 var(--line)" }}
         />
-        <Pagination page={current.page} pageSize={PAGE_SIZE} totalRows={rows.length} noun="khách hàng" onPage={setPage} />
       </div>
     </div>
   );

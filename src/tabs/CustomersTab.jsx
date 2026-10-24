@@ -3,6 +3,7 @@ import { useData } from "../store/DataContext.jsx";
 import { useDrawer } from "../components/Drawer.jsx";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
 import DataTable from "../components/table/DataTable.jsx";
+import { showToast } from "../components/Toast.jsx";
 import { money, formatDateVi, parseDateSort, randomId, todayInput } from "../lib/format.js";
 
 const ADD_BUTTON_STYLE = { padding: "0 12px", fontSize: 20, borderRadius: 8, height: 32, display: "flex", alignItems: "center", justifyContent: "center" };
@@ -26,6 +27,8 @@ export default function CustomersTab() {
   const drawer = useDrawer();
   const [search, setSearch] = useState("");
   const [nvText, setNvText] = useState("");
+  // Mã các khách hàng đang tick chọn (giữ nguyên khi đổi bộ lọc).
+  const [selected, setSelected] = useState(() => new Set());
 
   const nvList = useMemo(() => [...new Set(data.KHACH_HANG.map((c) => c.nv_quan_ly).filter(Boolean))], [data.KHACH_HANG]);
 
@@ -44,6 +47,20 @@ export default function CustomersTab() {
 
   const openDetail = (id) => openCustomerDrawer(drawer, data, id);
   const resetFilters = () => { setSearch(""); setNvText(""); };
+
+  // Danh sách đã chọn theo thứ tự trên bảng; khách đã chọn nhưng đang bị lọc ẩn thì xếp sau.
+  const selectedItems = useMemo(() => {
+    const shown = rows.map((r) => r.item).filter((item) => selected.has(item.id));
+    const hidden = data.KHACH_HANG.filter((item) => selected.has(item.id) && !shown.includes(item));
+    return [...shown, ...hidden];
+  }, [rows, data.KHACH_HANG, selected]);
+
+  const copySelected = async (field) => {
+    const text = [...new Set(selectedItems.map((item) => String(item[field] || "").trim()).filter(Boolean))].join(", ");
+    if (!text) return;
+    await copyText(text);
+    showToast(`Đã copy ${selectedItems.length} ${field === "id" ? "mã" : "tên"} khách hàng.`);
+  };
 
   return (
     <div className="card panel">
@@ -67,7 +84,17 @@ export default function CustomersTab() {
             onClear={() => setNvText("")}
           />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn btn-secondary" type="button" disabled={!selected.size} onClick={() => copySelected("id")}
+            title={selected.size ? "Copy mã các khách hàng đã chọn, cách nhau dấu phẩy" : "Tick chọn khách hàng ở cột đầu bảng trước"}>
+            📋 Copy mã KH{selected.size ? ` (${selected.size})` : ""}
+          </button>
+          {selected.size > 0 && (
+            <>
+              <button className="btn btn-secondary" type="button" onClick={() => copySelected("ten_kh")} title="Copy tên các khách hàng đã chọn, cách nhau dấu phẩy">Copy tên</button>
+              <button className="btn btn-secondary" type="button" onClick={() => setSelected(new Set())} title="Bỏ chọn tất cả">Bỏ chọn</button>
+            </>
+          )}
           {isAdmin && <button className="btn btn-primary" type="button" style={ADD_BUTTON_STYLE} title="Thêm khách hàng" onClick={() => openCustomerForm(drawer, requireAdmin, "")}>+</button>}
           <button className="btn btn-secondary" type="button" onClick={resetFilters}>Bỏ lọc</button>
         </div>
@@ -75,6 +102,7 @@ export default function CustomersTab() {
       <DataTable
         id="customers"
         name="Khách hàng"
+        selection={{ keyOf: ({ item }) => item.id, selected, onChange: setSelected }}
         columns={CUSTOMER_COLUMNS}
         rows={rows}
         rowKey={({ item }, index) => `${item.id}-${index}`}
@@ -102,8 +130,24 @@ const CUSTOMER_COLUMNS = [
   { key: "ban_hang", label: "Tiền bán hàng", render: ({ stats }) => money(stats.banHang) },
   { key: "thu_no", label: "Tiền thu nợ", render: ({ stats }) => money(stats.thuNo) },
   { key: "cong_no", label: "Công nợ", render: ({ stats }) => <strong style={{ color: debtTone(stats.congNo) }}>{money(stats.congNo)}</strong> },
-  { key: "trang_thai", label: "Trạng thái", render: ({ stats }) => <StatusBadge congNo={stats.congNo} paidText="Đã TT" /> }
+  { key: "trang_thai", label: "Trạng thái", sortValue: ({ stats }) => (stats.congNo > 0 ? "Còn nợ" : stats.congNo < 0 ? "Dư tiền" : "Đã TT"), render: ({ stats }) => <StatusBadge congNo={stats.congNo} paidText="Đã TT" /> }
 ];
+
+// Ghi vào clipboard; trình duyệt cũ / không có quyền thì dùng cách dự phòng.
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+}
 
 function StatusBadge({ congNo, paidText }) {
   if (congNo === 0) return <span className="badge-status bs-paid">{paidText}</span>;

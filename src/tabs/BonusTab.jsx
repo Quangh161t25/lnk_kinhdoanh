@@ -17,18 +17,21 @@ const rateTone = (rate) => {
   return { badge: "thuong-badge-none", bg: "#fff1f2" };
 };
 
-const BONUS_COLUMNS = (sum) => [
+// sumDs: tổng doanh số KHÔNG tính dòng quản lý (Tuyến, Nguyệt) vì doanh số của họ là tổng của người khác.
+const BONUS_COLUMNS = (sum, sumDs) => [
   { key: "thang", label: "THÁNG", headerStyle: { width: 110 }, style: { fontWeight: 600 }, render: (r) => r.thang },
   { key: "nv", label: "ID NV", headerStyle: { width: 180 }, className: "mono", style: { fontWeight: 600, color: "var(--brand)" }, render: (r) => r.nvId },
-  { key: "ds_chinh", label: "DS SP CHÍNH", align: "right", render: (r) => money(r.ds_chinh), footer: money(sum("ds_chinh")) },
-  { key: "ds_thuong", label: "DS SP THƯỜNG", align: "right", render: (r) => money(r.ds_thuong), footer: money(sum("ds_thuong")) },
-  { key: "ds_r1", label: "DS SP R1", align: "right", style: { color: "#0ea5e9" }, render: (r) => money(r.ds_r1 || 0), footer: money(sum("ds_r1")), footerStyle: { color: "#0ea5e9" } },
+  { key: "ds_chinh", label: "DS SP CHÍNH", align: "right", render: (r) => money(r.ds_chinh), footer: money(sumDs("ds_chinh")) },
+  { key: "ds_thuong", label: "DS SP THƯỜNG", align: "right", render: (r) => money(r.ds_thuong), footer: money(sumDs("ds_thuong")) },
+  { key: "ds_r1", label: "DS SP R1", align: "right", style: { color: "#0ea5e9" }, render: (r) => money(r.ds_r1 || 0), footer: money(sumDs("ds_r1")), footerStyle: { color: "#0ea5e9" } },
   { key: "thuong_chinh", label: "THƯỞNG SP CHÍNH", align: "right", style: { color: "#2563eb" }, render: (r) => money(r.thuong_sp_chinh), footer: money(sum("thuong_sp_chinh")), footerStyle: { color: "#2563eb" } },
   { key: "thuong_thuong", label: "THƯỞNG SP THƯỜNG", align: "right", style: { color: "#7c3aed" }, render: (r) => money(r.thuong_sp_thuong), footer: money(sum("thuong_sp_thuong")), footerStyle: { color: "#7c3aed" } },
   { key: "thuong_r1", label: "THƯỞNG SP R1", align: "right", style: { color: "#0ea5e9" }, render: (r) => money(r.thuong_sp_r1 || 0), footer: money(sum("thuong_sp_r1")), footerStyle: { color: "#0ea5e9" } },
   { key: "thuong_ds", label: "THƯỞNG DOANH SỐ", align: "right", style: { fontWeight: 700 }, render: (r) => money(r.thuong_doanh_so), footer: money(sum("thuong_doanh_so")) },
-  { key: "ti_le", label: "TỈ LỆ THÁNG NÀY", align: "right", headerStyle: { width: 130 }, render: (r) => <span className={`badge ${rateTone(r.ti_le_thu_no).badge}`} style={{ fontSize: 12 }}>{r.ti_le_thu_no.toFixed(0) + "%"}</span>, footer: "" },
-  { key: "tong_thuong", label: "TỔNG TIỀN THƯỞNG", align: "right", headerStyle: { background: "#fff7ed", fontWeight: 700 }, style: (r) => ({ fontWeight: 700, background: rateTone(r.ti_le_thu_no).bg }), render: (r) => money(r.tong_tien_thuong), footer: money(sum("tong_tien_thuong")), footerStyle: { color: "#e11d48", background: "#fff7ed" } },
+  { key: "ti_le", label: "TỈ LỆ THÁNG NÀY", align: "right", headerStyle: { width: 130 }, sortValue: (r) => (r.isManager ? null : r.ti_le_thu_no), render: (r) => (r.isManager
+    ? <span style={{ color: "var(--muted)" }} title="Dòng quản lý: thưởng không phụ thuộc tỉ lệ thu nợ">—</span>
+    : <span className={`badge ${rateTone(r.ti_le_thu_no).badge}`} style={{ fontSize: 12 }}>{r.ti_le_thu_no.toFixed(0) + "%"}</span>), footer: "" },
+  { key: "tong_thuong", label: "TỔNG TIỀN THƯỞNG", align: "right", headerStyle: { background: "#fff7ed", fontWeight: 700 }, style: (r) => ({ fontWeight: 700, background: r.isManager ? "#fff7ed" : rateTone(r.ti_le_thu_no).bg }), render: (r) => money(r.tong_tien_thuong), footer: money(sum("tong_tien_thuong")), footerStyle: { color: "#e11d48", background: "#fff7ed" } },
   { key: "thuc_nhan", label: "TỔNG THỰC NHẬN", align: "right", headerStyle: { background: "#f0fdf4", fontWeight: 700 }, style: { fontWeight: 800, background: "#f0fdf4", color: "#16a34a" }, render: (r) => money(r.tong_thuc_nhan), footer: money(sum("tong_thuc_nhan")), footerStyle: { color: "#16a34a", background: "#f0fdf4" } }
 ];
 
@@ -55,6 +58,7 @@ export default function BonusTab() {
   const nvIds = [...new Set(rows.map((r) => r.nvId))].sort();
   const filtered = rows.filter((r) => (!filterMonth || r.thang === filterMonth) && (!filterNv || r.nvId === filterNv));
   const sum = (field) => filtered.reduce((s, r) => s + (r[field] || 0), 0);
+  const sumDs = (field) => filtered.reduce((s, r) => s + (r.isManager ? 0 : r[field] || 0), 0);
 
   const rules = data.DK_THUONG;
   const ruleKinds = [...new Set(rules.map((r) => JSON.stringify({ loai: r.loai, kieu: r.kieu })))];
@@ -87,7 +91,7 @@ export default function BonusTab() {
         <DataTable
           id="bonus"
           name="Thưởng nhân viên theo tháng"
-          columns={BONUS_COLUMNS(sum)}
+          columns={BONUS_COLUMNS(sum, sumDs)}
           rows={filtered}
           rowKey={(r) => `${r.thang}||${r.nvId}`}
           empty="Không có dữ liệu thưởng. Vui lòng kiểm tra dữ liệu DH_CT và DK_THUONG."

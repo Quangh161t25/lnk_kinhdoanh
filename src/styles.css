@@ -2353,3 +2353,379 @@ body.dt-resizing {
   .cs-toggles { grid-area: t; justify-content: flex-end }
   .cs-move { grid-area: m }
 }
+
+/* =====================================================================
+   Ô lọc nhiều giá trị (MultiValueFilter) và lọc ngày
+   ===================================================================== */
+
+.mvf {
+  position: relative;
+  max-width: 100%
+}
+
+.mvf-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-height: 38px;
+  padding: 3px 28px 3px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  cursor: text;
+  position: relative;
+  overflow: hidden
+}
+
+.mvf-box.focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-ring)
+}
+
+.mvf-box input {
+  flex: 1;
+  min-width: 60px;
+  border: 0 !important;
+  outline: 0;
+  box-shadow: none !important;
+  height: 30px;
+  padding: 0 4px;
+  background: transparent;
+  font-size: 13.5px
+}
+
+.mvf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 110px;
+  padding: 2px 4px 2px 8px;
+  border-radius: 6px;
+  background: var(--brand-soft);
+  color: var(--brand-600);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0
+}
+
+.mvf-chip.free {
+  background: #fef3c7;
+  color: #92400e
+}
+
+.mvf-chip button,
+.mvf-clear {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 3px
+}
+
+.mvf-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 16px
+}
+
+.mvf-more {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #eef1f6;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700
+}
+
+.mvf-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max(100%, 340px);
+  max-width: 92vw;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  z-index: 1100;
+  overflow: hidden;
+  animation: fade-up .12s ease-out
+}
+
+.mvf-hint {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: var(--soft)
+}
+
+.mvf-add {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: #fffbeb;
+  color: #92400e;
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
+.mvf-options {
+  max-height: 260px;
+  overflow: auto;
+  padding: 4px
+}
+
+.mvf-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px
+}
+
+.mvf-option:hover {
+  background: var(--soft)
+}
+
+.mvf-option input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--brand);
+  flex-shrink: 0
+}
+
+.mvf-id {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap
+}
+
+.mvf-name {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
+.mvf-empty {
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12.5px
+}
+
+.mvf-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted)
+}
+
+.mvf-foot button {
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12.5px
+}
+
+.date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap
+}
+
+.date-range > span {
+  color: var(--muted);
+  font-size: 12.5px
+}
+
+.quick-chip {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s
+}
+
+.quick-chip:hover {
+  background: var(--soft)
+}
+
+.quick-chip.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff
+}
+
+/* Chọn dòng + thanh thao tác khi đã chọn */
+.dt-check {
+  width: 36px;
+  min-width: 36px;
+  text-align: center !important;
+  padding-left: 8px !important;
+  padding-right: 4px !important
+}
+
+.dt-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand);
+  cursor: pointer;
+  vertical-align: middle
+}
+
+tbody tr.dt-selected,
+tbody tr.dt-selected:hover {
+  background: var(--brand-soft) !important
+}
+
+.selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid #c9d5ff;
+  background: var(--brand-soft);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--brand-600);
+  font-weight: 600
+}
+
+.selection-bar .btn {
+  min-height: 32px;
+  padding: 5px 12px;
+  font-size: 13px
+}
+
+.selection-bar .spacer {
+  flex: 1
+}
+
+.link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--brand);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px
+}
+
+.link-btn:hover {
+  background: #fff
+}
+
+.bulk-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.5
+}
+
+.check-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  font-size: 13.5px
+}
+
+.check-line input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--brand)
+}
+
+.check-line small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px
+}
+
+.check-line b.count {
+  color: var(--brand-600)
+}
+
+/* Sắp xếp khi bấm tiêu đề cột */
+.dt-table th.dt-sortable {
+  cursor: pointer;
+  user-select: none
+}
+
+.dt-table th.dt-sortable:hover {
+  color: var(--text-2);
+  background: #eef2f8
+}
+
+.dt-sort-ind {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 9px;
+  color: #b6c1d3;
+  vertical-align: 1px
+}
+
+.dt-table th.dt-sortable:hover .dt-sort-ind {
+  color: var(--muted)
+}
+
+.dt-table th.dt-sorted {
+  color: var(--brand-600)
+}
+
+.dt-table th.dt-sorted .dt-sort-ind {
+  color: var(--brand)
+}
+
+/* Nút tùy chỉnh cột chỉ còn biểu tượng */
+.dt-settings-btn {
+  width: 30px;
+  padding: 0;
+  justify-content: center
+}

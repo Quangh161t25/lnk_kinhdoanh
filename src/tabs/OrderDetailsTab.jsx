@@ -1,16 +1,28 @@
 import { useMemo, useRef, useState } from "react";
 import { useData } from "../store/DataContext.jsx";
 import { useDrawer } from "../components/Drawer.jsx";
-import { appendRows } from "../store/data.js";
-import { showBusyToast, hideToast } from "../components/Toast.jsx";
+import { appendRows, replaceSheet } from "../store/data.js";
+import { showToast, showBusyToast, hideToast } from "../components/Toast.jsx";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
 import { readWorkbook, excelSerialToDate, toAmount } from "../lib/excel.js";
 import { money, formatDateVi, parseDateSort, randomId } from "../lib/format.js";
 import DataTable from "../components/table/DataTable.jsx";
+import Modal, { SelectionBar } from "../components/common/Modal.jsx";
+import MultiValueFilter, { makeTokenMatcher } from "../components/common/MultiValueFilter.jsx";
+import { usePersistentState } from "../store/persistentState.js";
 
 const MAX_ROWS = 150;
 const EMPTY_PICK = { text: "", value: "" };
-const EMPTY_FILTERS = { search: "", nv: EMPTY_PICK, sp: EMPTY_PICK, npp: EMPTY_PICK };
+const EMPTY_FILTERS = { search: "", nv: EMPTY_PICK, sp: [], npp: [], from: "", to: "" };
+
+// "yyyy-mm-dd" → "yyyymmdd" để so sánh với parseDateSort(ngay).
+const dayKey = (iso) => String(iso || "").replace(/-/g, "");
+const isoOf = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+// Khoảng ngày của tháng hiện tại (offset 0) hoặc tháng trước (offset -1).
+const monthRange = (offset) => {
+  const now = new Date();
+  return { from: isoOf(new Date(now.getFullYear(), now.getMonth() + offset, 1)), to: isoOf(new Date(now.getFullYear(), now.getMonth() + offset + 1, 0)) };
+};
 
 // "ID - Tên" khi tên khác ID, ngược lại chỉ ID.
 const labelWithName = (id, name) => (name && name !== id ? `${id} - ${name}` : id);
@@ -71,7 +83,9 @@ export default function OrderDetailsTab() {
   const { data, users, isAdmin, customerName, productName, staffName, getData, commit, markSynced } = useData();
   const drawer = useDrawer();
   const fileRef = useRef(null);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = usePersistentState("orders.filters", EMPTY_FILTERS);
+  const [selected, setSelected] = useState(() => new Set());
+  const [resyncOpen, setResyncOpen] = useState(false);
   const setFilter = (patch) => setFilters((current) => ({ ...current, ...patch }));
 
   const pickLists = useMemo(() => {
@@ -86,18 +100,30 @@ export default function OrderDetailsTab() {
   const rows = useMemo(() => {
     const q = filters.search.toLowerCase();
     const fNv = filters.nv.value.toLowerCase();
-    const fSp = filters.sp.value.toLowerCase();
-    const fNpp = filters.npp.value.toLowerCase();
+    const matchSp = makeTokenMatcher(filters.sp, pickLists.sp);
+    const matchNpp = makeTokenMatcher(filters.npp, pickLists.npp);
+    const from = dayKey(filters.from);
+    const to = dayKey(filters.to);
     return data.DH_CT
       .filter((item) => {
         if (fNv && !(item.id_nv || "").toLowerCase().includes(fNv)) return false;
-        if (fSp && !(item.id_sp || "").toLowerCase().includes(fSp)) return false;
-        if (fNpp && !(item.npp || "").toLowerCase().includes(fNpp)) return false;
+        if (filters.sp.length && !matchSp(item.id_sp, productName(item.id_sp))) return false;
+        if (filters.npp.length && !matchNpp(item.npp, customerName(item.npp))) return false;
+        if (from || to) {
+          const day = parseDateSort(item.ngay);
+          if (from && day < from) return false;
+          if (to && day > to) return false;
+        }
         if (q && ![item.id, item.id_dh, item.id_sp, productName(item.id_sp), item.npp, item.id_nv].join(" ").toLowerCase().includes(q)) return false;
         return true;
       })
       .sort((a, b) => parseDateSort(b.ngay).localeCompare(parseDateSort(a.ngay)));
-  }, [data.DH_CT, filters, productName]);
+  }, [data.DH_CT, filters, productName, customerName, pickLists]);
+
+  const thisMonth = monthRange(0);
+  const lastMonth = monthRange(-1);
+  const isRange = (range) => filters.from === range.from && filters.to === range.to;
+  const toggleRange = (range) => setFilter(isRange(range) ? { from: "", to: "" } : range);
 
   const sumQty = rows.reduce((sum, r) => sum + Number(r.slg || 0), 0);
   const sumTotal = rows.reduce((sum, r) => sum + Number(r.thanh_tien || 0), 0);
@@ -165,8 +191,15 @@ export default function OrderDetailsTab() {
         <div className="toolbar-search" style={{ flexWrap: "wrap", alignItems: "center", flex: 1 }}>
           <input type="text" placeholder="Tìm ID đơn, sản phẩm, NPP, NV..." style={{ minWidth: 250 }} value={filters.search} onChange={(e) => setFilter({ search: e.target.value })} />
           {pickFilter("nv", "Lọc Nhân viên...")}
-          {pickFilter("sp", "Lọc ID Sản phẩm...")}
-          {pickFilter("npp", "Lọc Nhà phân phối...")}
+          <MultiValueFilter options={pickLists.sp} values={filters.sp} onChange={(sp) => setFilter({ sp })} placeholder="Lọc sản phẩm (nhiều, cách dấu ,)" noun="sản phẩm" width={250} />
+          <MultiValueFilter options={pickLists.npp} values={filters.npp} onChange={(npp) => setFilter({ npp })} placeholder="Lọc NPP (nhiều, cách dấu ,)" noun="NPP" width={250} />
+          <div className="date-range">
+            <input type="date" title="Từ ngày" value={filters.from} onChange={(e) => setFilter({ from: e.target.value })} />
+            <span>→</span>
+            <input type="date" title="Tới ngày" value={filters.to} onChange={(e) => setFilter({ to: e.target.value })} />
+            <button type="button" className={`quick-chip${isRange(thisMonth) ? " active" : ""}`} onClick={() => toggleRange(thisMonth)}>Tháng này</button>
+            <button type="button" className={`quick-chip${isRange(lastMonth) ? " active" : ""}`} onClick={() => toggleRange(lastMonth)}>Tháng trước</button>
+          </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {isAdmin && (
@@ -178,8 +211,13 @@ export default function OrderDetailsTab() {
           <button className="btn btn-secondary" type="button" onClick={() => setFilters(EMPTY_FILTERS)}>Bỏ lọc</button>
         </div>
       </div>
+      <SelectionBar count={selected.size} total={rows.length} noun="dòng"
+        onSelectAll={() => setSelected(new Set(rows.map((item) => item.id)))} onClear={() => setSelected(new Set())}>
+        {isAdmin && <button className="btn btn-primary" type="button" onClick={() => setResyncOpen(true)}>⟳ Đồng bộ lại ({selected.size})</button>}
+      </SelectionBar>
       <DataTable
         id="order-details"
+        selection={{ keyOf: (item) => item.id, selected, onChange: setSelected }}
         name="Đơn hàng chi tiết"
         columns={[
           { key: "id_dh", label: "ID đơn hàng", className: "mono", render: (item) => <span className="badge" style={{ background: "#e0f2fe", color: "#0284c7" }}>{item.id_dh}</span> },
@@ -192,15 +230,95 @@ export default function OrderDetailsTab() {
           { key: "slg", label: "Số lượng", align: "center", render: (item) => item.slg, footer: sumQty, footerStyle: { color: "var(--brand)" } },
           { key: "thanh_tien", label: "Thành tiền", align: "right", render: (item) => <strong style={{ color: "var(--brand)" }}>{money(item.thanh_tien)}</strong>, footer: money(sumTotal), footerStyle: { color: "var(--brand)" } }
         ]}
-        rows={rows.slice(0, MAX_ROWS)}
+        rows={rows}
+        limit={MAX_ROWS}
         rowKey={(item, index) => `${item.id}-${index}`}
         rowProps={(item) => ({ "data-action": "view-order-detail", style: { cursor: "pointer" }, onDoubleClick: () => openOrderDrawer(drawer, data, item.id_dh) })}
         empty="Không tìm thấy chi tiết đơn hàng."
-        after={rows.length > MAX_ROWS && <>... và <strong>{rows.length - MAX_ROWS}</strong> dòng khác (Hãy lọc chi tiết hơn)</>}
         footerLabel={<strong>TỔNG CỘNG:</strong>}
         tfootStyle={{ fontWeight: "bold", background: "#f8fafc" }}
       />
+      {resyncOpen && <ResyncOrders ids={selected} onClose={() => setResyncOpen(false)} onDone={() => { setResyncOpen(false); setSelected(new Set()); }} />}
     </div>
+  );
+}
+
+// Tính các dòng DH_CT sẽ đổi khi đồng bộ lại theo dữ liệu gốc hiện tại.
+// Chỉ ghi đè khi dữ liệu gốc có giá trị (sản phẩm chưa có NCC thì giữ NCC cũ của dòng).
+function planResync(data, ids, opts) {
+  const products = new Map(data.DS_SP.map((p) => [String(p.id || "").trim(), p]));
+  const customers = new Map(data.KHACH_HANG.map((c) => [String(c.id || "").trim(), c]));
+  const counts = { ncc: 0, type: 0, nv: 0, rows: 0 };
+  const DH_CT = data.DH_CT.map((row) => {
+    if (!ids.has(row.id)) return row;
+    const product = products.get(String(row.id_sp || "").trim());
+    const customer = customers.get(String(row.npp || "").trim());
+    const next = { ...row };
+    let changed = false;
+    const ncc = String(product?.ncc || "").trim();
+    if (opts.ncc && ncc && ncc !== String(row.ncc || "").trim()) { next.ncc = ncc; counts.ncc++; changed = true; }
+    const type = String(product?.sp_chinh_thuong || "").trim();
+    if (opts.type && type && type !== String(row.sp_chinh_thuong || "").trim()) { next.sp_chinh_thuong = type; counts.type++; changed = true; }
+    const nv = String(customer?.nv_quan_ly || "").trim();
+    if (opts.nv && nv && nv !== String(row.id_nv || "").trim()) { next.id_nv = nv; counts.nv++; changed = true; }
+    if (changed) counts.rows++;
+    return changed ? next : row;
+  });
+  return { DH_CT, counts };
+}
+
+// Đồng bộ lại các dòng đơn hàng đã chọn theo DS_SP (NCC, loại SP) và KHACH_HANG (NV quản lý).
+function ResyncOrders({ ids, onClose, onDone }) {
+  const { getData, commit, markSynced, requireAdmin } = useData();
+  const [opts, setOpts] = useState({ ncc: true, type: true, nv: false });
+  const [saving, setSaving] = useState(false);
+  const plan = useMemo(() => planResync(getData(), ids, opts), [getData, ids, opts]);
+  const toggle = (key) => setOpts((o) => ({ ...o, [key]: !o[key] }));
+
+  async function run() {
+    if (!requireAdmin("Chỉ admin mới được đồng bộ lại đơn hàng.")) return;
+    if (!plan.counts.rows) { showToast("Các dòng đã chọn đã khớp, không có gì thay đổi."); return onDone(); }
+    setSaving(true);
+    try {
+      const fresh = planResync(getData(), ids, opts);
+      const next = commit({ ...getData(), DH_CT: fresh.DH_CT });
+      await replaceSheet("DH_CT", next.DH_CT);
+      markSynced();
+      showToast(`Đã đồng bộ lại ${fresh.counts.rows} dòng đơn hàng.`);
+      onDone();
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || "Lỗi khi đồng bộ đơn hàng.", true);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`Đồng bộ lại ${ids.size.toLocaleString("vi-VN")} dòng đơn hàng`}
+      subtitle="Lấy lại thông tin mới nhất từ danh sách sản phẩm và khách hàng, ghi vào sheet DH_CT."
+      onClose={onClose}
+      footer={<>
+        <button className="btn btn-secondary" type="button" onClick={onClose}>Hủy</button>
+        <button className="btn btn-primary" type="button" onClick={run} disabled={saving}>{saving ? "Đang đồng bộ…" : `Đồng bộ ${plan.counts.rows} dòng`}</button>
+      </>}
+    >
+      <label className="check-line">
+        <input type="checkbox" checked={opts.ncc} onChange={() => toggle("ncc")} />
+        <span>NCC theo danh sách sản phẩm <b className="count">({plan.counts.ncc} dòng đổi)</b><small>Dùng cho bảng Doanh số theo NCC và tab Tỉ trọng.</small></span>
+      </label>
+      <label className="check-line">
+        <input type="checkbox" checked={opts.type} onChange={() => toggle("type")} />
+        <span>Loại SP (chính / thường / R1) theo sản phẩm <b className="count">({plan.counts.type} dòng đổi)</b><small>Ảnh hưởng cách tính thưởng nhân viên.</small></span>
+      </label>
+      <label className="check-line">
+        <input type="checkbox" checked={opts.nv} onChange={() => toggle("nv")} />
+        <span>Nhân viên theo NV quản lý của khách hàng <b className="count">({plan.counts.nv} dòng đổi)</b><small>Đổi người được tính doanh số/thưởng của các dòng này — chỉ bật khi chắc chắn.</small></span>
+      </label>
+      <p className="bulk-note" style={{ marginTop: 6 }}>
+        Sẽ thay đổi <b>{plan.counts.rows}</b> / {ids.size.toLocaleString("vi-VN")} dòng đã chọn. Dòng nào đã khớp hoặc sản phẩm/khách chưa có dữ liệu thì giữ nguyên.
+      </p>
+    </Modal>
   );
 }
 

@@ -1,9 +1,9 @@
 // Tính thưởng nhân viên theo tháng (chuyển nguyên cách tính từ bản cũ).
 import { currentYearMonth, normalizeBonusKey, normalizeMonthKey, normalizeProductType, parseLooseNumber, toYearMonth } from "./format.js";
 
-// Quản lý nhận 0,2% doanh số SP thường của nhóm nhân viên bên dưới.
+// Lê Quang Tuyến nhận 0,2% tổng doanh số SP thường của mọi mã NV trong DH_CT
+// (kể cả Công ty Vũ Gia), trừ Nguyễn Thị Nguyệt.
 const SPECIAL_NV = "Lê Quang Tuyến";
-const SPECIAL_TEAM = ["ngô tuấn anh", "trần doãn sáng", "kiều trung đức", "vũ công tâm", "đoàn văn quang"];
 
 // Nguyễn Thị Nguyệt nhận 0,05% tổng doanh số SP chính + SP thường của mọi mã NV
 // trong DH_CT (kể cả Công ty Vũ Gia), trừ Lê Quang Tuyến.
@@ -116,12 +116,14 @@ export function computeBonusRows(data) {
 
   const teamRevenue = {};
   Object.values(sales).forEach((entry) => {
-    if (SPECIAL_TEAM.includes(lower(entry.nvId))) teamRevenue[entry.thang] = (teamRevenue[entry.thang] || 0) + Number(entry.ds_thuong || 0);
+    const id = lower(entry.nvId);
+    if (id === lower(SPECIAL_NV) || id === lower(NGUYET_NV)) return;
+    teamRevenue[entry.thang] = (teamRevenue[entry.thang] || 0) + Number(entry.ds_thuong || 0);
   });
   Object.entries(teamRevenue).forEach(([thang, revenue]) => {
     if (revenue <= 0) return;
     const specialRow = {
-      thang, nvId: SPECIAL_NV, ds_chinh: 0, ds_thuong: revenue, ds_r1: 0,
+      thang, nvId: SPECIAL_NV, isManager: true, ds_chinh: 0, ds_thuong: revenue, ds_r1: 0,
       thuong_sp_chinh: 0, thuong_sp_thuong: 0, thuong_sp_r1: 0, thuong_doanh_so: 0,
       ti_le_thu_no: 0, no_phat_sinh: 0, no_da_thu: 0,
       tong_tien_thuong: Math.round(revenue * 0.002)
@@ -133,13 +135,14 @@ export function computeBonusRows(data) {
 
   const companyRevenue = {};
   Object.values(sales).forEach((entry) => {
-    if (lower(entry.nvId) === lower(SPECIAL_NV)) return;
+    const id = lower(entry.nvId);
+    if (id === lower(SPECIAL_NV) || id === lower(NGUYET_NV)) return;
     companyRevenue[entry.thang] = (companyRevenue[entry.thang] || 0) + Number(entry.ds_chinh || 0) + Number(entry.ds_thuong || 0);
   });
   Object.entries(companyRevenue).forEach(([thang, revenue]) => {
     if (revenue <= 0) return;
     const nguyetRow = {
-      thang, nvId: NGUYET_NV, ds_chinh: 0, ds_thuong: revenue, ds_r1: 0,
+      thang, nvId: NGUYET_NV, isManager: true, ds_chinh: 0, ds_thuong: revenue, ds_r1: 0,
       thuong_sp_chinh: 0, thuong_sp_thuong: 0, thuong_sp_r1: 0, thuong_doanh_so: 0,
       ti_le_thu_no: 0, no_phat_sinh: 0, no_da_thu: 0,
       tong_tien_thuong: Math.round(revenue * NGUYET_RATE)
