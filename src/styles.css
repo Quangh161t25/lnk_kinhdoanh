@@ -2729,3 +2729,18 @@ tbody tr.dt-selected:hover {
   padding: 0;
   justify-content: center
 }
+
+/* Tiêu đề biểu đồ kèm nút đổi kiểu */
+.chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px
+}
+
+.chart-head h3 {
+  margin: 0;
+  font-size: 14px
+}

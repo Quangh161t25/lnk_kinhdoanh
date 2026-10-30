@@ -85,16 +85,97 @@ function useStickyFilter(wrapRef, filterRef) {
   }, [wrapRef, filterRef]);
 }
 
-function MonthChart({ labels, values }) {
+const SALES_TYPES = [
+  { key: "thuong", label: "Thường", color: "#2563eb" },
+  { key: "chinh", label: "Chính", color: "#7c3aed" },
+  { key: "r1", label: "R1", color: "#ea580c" }
+];
+
+const CHART_MODES = [
+  { id: 1, title: "Tổng doanh số" },
+  { id: 2, title: "Cột chồng: chia 3 khúc theo loại" },
+  { id: 3, title: "Cột nhóm: tách 3 cột theo loại" },
+  { id: 4, title: "Đường xu hướng từng loại" },
+  { id: 5, title: "Tỉ trọng % từng loại" }
+];
+const CHART_MODE_KEY = "dash_chart_mode";
+
+const readChartMode = () => {
+  try {
+    const saved = Number(localStorage.getItem(CHART_MODE_KEY));
+    return CHART_MODES.some((m) => m.id === saved) ? saved : 1;
+  } catch {
+    return 1;
+  }
+};
+
+// Tổng 3 loại của một tháng, dùng làm mẫu số cho tỉ trọng.
+const typeSum = (row) => SALES_TYPES.reduce((sum, t) => sum + Math.max(0, row[t.key] || 0), 0);
+const percentOf = (row, key) => {
+  const total = typeSum(row);
+  return total > 0 ? (Math.max(0, row[key] || 0) / total) * 100 : 0;
+};
+
+function buildChartConfig(rows, mode) {
+  const labels = rows.map((r) => r.month);
+  if (mode === 1) {
+    return {
+      type: "bar",
+      data: { labels, datasets: [{ data: rows.map((r) => r.s), backgroundColor: "#2d5bff", borderRadius: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    };
+  }
+  const isLine = mode === 4;
+  const isPercent = mode === 5;
+  const isStacked = mode === 2 || isPercent;
+  return {
+    type: isLine ? "line" : "bar",
+    data: {
+      labels,
+      datasets: SALES_TYPES.map((t) => ({
+        label: t.label,
+        data: rows.map((r) => (isPercent ? percentOf(r, t.key) : r[t.key] || 0)),
+        backgroundColor: t.color,
+        borderColor: t.color,
+        ...(isLine ? { tension: 0.25, pointRadius: 3, borderWidth: 2 } : { borderRadius: isStacked ? 0 : 3 })
+      }))
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { stacked: isStacked },
+        y: { stacked: isStacked, ...(isPercent ? { max: 100, ticks: { callback: (value) => `${value}%` } } : null) }
+      },
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, boxHeight: 12 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const row = rows[ctx.dataIndex];
+              const key = SALES_TYPES[ctx.datasetIndex].key;
+              return `${ctx.dataset.label}: ${money(row[key] || 0)} (${percentOf(row, key).toFixed(1)}%)`;
+            },
+            footer: (items) => {
+              const row = rows[items[0].dataIndex];
+              const lines = [`Tổng doanh số: ${money(row.s)}`];
+              if (Math.round(row.khac)) lines.push(`Chưa phân loại: ${money(row.khac)}`);
+              return lines;
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
+function MonthChart({ rows, mode }) {
   const canvasRef = useRef(null);
   useEffect(() => {
-    const chart = new Chart(canvasRef.current, {
-      type: "bar",
-      data: { labels, datasets: [{ data: values, backgroundColor: "#2d5bff", borderRadius: 4 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-    });
+    const chart = new Chart(canvasRef.current, buildChartConfig(rows, mode));
     return () => chart.destroy();
-  }, [labels, values]);
+  }, [rows, mode]);
   return <canvas ref={canvasRef} />;
 }
 
@@ -122,10 +203,12 @@ export default function SalesDashboardTab() {
     [data, nvOptions, month, nvs, khs]
   );
 
-  const chart = useMemo(() => {
-    const ascending = stats.monthRows.slice().reverse();
-    return { labels: ascending.map((r) => r.month), values: ascending.map((r) => r.s) };
-  }, [stats.monthRows]);
+  const chartRows = useMemo(() => stats.monthRows.slice().reverse(), [stats.monthRows]);
+  const [chartMode, setChartMode] = useState(readChartMode);
+  const pickChartMode = (mode) => {
+    setChartMode(mode);
+    try { localStorage.setItem(CHART_MODE_KEY, String(mode)); } catch { }
+  };
 
   const resetPages = () => { setKhPage(1); setSpPage(1); };
   const changeFilter = (setter) => (value) => { setter(value); resetPages(); };
@@ -193,8 +276,16 @@ export default function SalesDashboardTab() {
           />
         </div>
         <div className="card" style={{ padding: 16 }}>
-          <h3 style={{ margin: "0 0 16px", fontSize: 14 }}>Doanh số theo tháng</h3>
-          <div style={{ height: 260 }}><MonthChart labels={chart.labels} values={chart.values} /></div>
+          <div className="chart-head">
+            <h3>Doanh số theo tháng</h3>
+            <div className="cs-segment" role="group" aria-label="Kiểu biểu đồ">
+              {CHART_MODES.map((m) => (
+                <button key={m.id} type="button" title={m.title} aria-label={m.title} aria-pressed={chartMode === m.id}
+                  className={chartMode === m.id ? "active" : ""} onClick={() => pickChartMode(m.id)}>{m.id}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ height: 260 }}><MonthChart rows={chartRows} mode={chartMode} /></div>
         </div>
       </div>
 

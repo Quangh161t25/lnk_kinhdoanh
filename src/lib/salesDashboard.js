@@ -1,5 +1,5 @@
 // Số liệu cho tab Dashboard Kinh doanh (chuyển nguyên cách tính từ bản cũ).
-import { currentYearMonth, toMonthLabel, toYearMonth } from "./format.js";
+import { currentYearMonth, normalizeProductType, toMonthLabel, toYearMonth } from "./format.js";
 
 const prevMonth = (ym) => {
   if (!ym) return null;
@@ -48,10 +48,18 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
 
   // Doanh số theo loại SP (chính/thường/...) từ DH_CT; bỏ qua dòng chưa phân loại.
   const typeTotals = {};
+  const typesByMonth = {};
   data.DH_CT.filter((item) => matchesFilters(item, "npp")).forEach((item) => {
+    const amount = Number(item.thanh_tien || 0);
+    const productType = normalizeProductType(item.sp_chinh_thuong);
+    if (productType) {
+      const m = toMonthLabel(item.ngay);
+      if (!typesByMonth[m]) typesByMonth[m] = { thuong: 0, chinh: 0, r1: 0 };
+      typesByMonth[m][productType] += amount;
+    }
     const type = String(item.sp_chinh_thuong || "").trim().toUpperCase();
     if (!type) return;
-    typeTotals[type] = (typeTotals[type] || 0) + Number(item.thanh_tien || 0);
+    typeTotals[type] = (typeTotals[type] || 0) + amount;
   });
 
   const nvStats = {};
@@ -141,7 +149,9 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
     const thu = debtByMonth[m] ? debtByMonth[m].thu : 0;
     const rong = chi - thu;
     runningDebt += rong;
-    monthStats[m] = { s, c, chi, thu, rong, luyKe: runningDebt };
+    const types = typesByMonth[m] || { thuong: 0, chinh: 0, r1: 0 };
+    // khac: phần doanh số chưa phân loại, để 3 loại + khac luôn bằng đúng doanh số tháng.
+    monthStats[m] = { s, c, chi, thu, rong, luyKe: runningDebt, ...types, khac: s - types.thuong - types.chinh - types.r1 };
   });
 
   const displayMonths = monthLabel ? allMonths.filter((m) => m === monthLabel) : allMonths;
