@@ -1,5 +1,5 @@
 // Số liệu cho tab Dashboard Kinh doanh (chuyển nguyên cách tính từ bản cũ).
-import { currentYearMonth, normalizeProductType, toMonthLabel, toYearMonth } from "./format.js";
+import { currentYearMonth, normalizeProductType, parseDateSort, toMonthLabel, toYearMonth } from "./format.js";
 
 const prevMonth = (ym) => {
   if (!ym) return null;
@@ -14,6 +14,27 @@ const sortKey = (label) => {
   const p = label.split("/");
   return p.length === 2 ? p[1] + p[0] : "000000";
 };
+
+// Nến của một tháng từ doanh số từng ngày có bán: mở = ngày đầu, đóng = ngày cuối,
+// cao/thấp = ngày bán nhiều/ít nhất. null nếu tháng không có ngày bán nào.
+function dailyCandle(days) {
+  const keys = Object.keys(days || {}).sort();
+  if (!keys.length) return null;
+  const toLabel = (key) => `${key.slice(6, 8)}/${key.slice(4, 6)}`;
+  let high = keys[0];
+  let low = keys[0];
+  keys.forEach((key) => {
+    if (days[key] > days[high]) high = key;
+    if (days[key] < days[low]) low = key;
+  });
+  const first = keys[0];
+  const last = keys[keys.length - 1];
+  return {
+    open: days[first], close: days[last], high: days[high], low: days[low],
+    openDay: toLabel(first), closeDay: toLabel(last), highDay: toLabel(high), lowDay: toLabel(low),
+    days: keys.length
+  };
+}
 
 const newNvStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, chiCM: 0, thuCM: 0, chiLM: 0, luyKe: 0 });
 const newKhStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, luyKe: 0 });
@@ -72,9 +93,11 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
   const salesByMonth = {};
   orders.forEach((d) => {
     const m = toMonthLabel(d.ngay);
-    if (!salesByMonth[m]) salesByMonth[m] = { c: 0, s: 0 };
+    if (!salesByMonth[m]) salesByMonth[m] = { c: 0, s: 0, days: {} };
     salesByMonth[m].c++;
     salesByMonth[m].s += Number(d.thanh_tien || 0);
+    const day = parseDateSort(d.ngay);
+    salesByMonth[m].days[day] = (salesByMonth[m].days[day] || 0) + Number(d.thanh_tien || 0);
 
     const n = d.id_nv || "N/A";
     if (!nvStats[n]) nvStats[n] = newNvStats();
@@ -151,7 +174,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
     runningDebt += rong;
     const types = typesByMonth[m] || { thuong: 0, chinh: 0, r1: 0 };
     // khac: phần doanh số chưa phân loại, để 3 loại + khac luôn bằng đúng doanh số tháng.
-    monthStats[m] = { s, c, chi, thu, rong, luyKe: runningDebt, ...types, khac: s - types.thuong - types.chinh - types.r1 };
+    monthStats[m] = { s, c, chi, thu, rong, luyKe: runningDebt, ...types, khac: s - types.thuong - types.chinh - types.r1, candle: dailyCandle(salesByMonth[m]?.days) };
   });
 
   const displayMonths = monthLabel ? allMonths.filter((m) => m === monthLabel) : allMonths;

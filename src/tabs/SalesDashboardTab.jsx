@@ -5,6 +5,7 @@ import MultiSelect from "../components/common/MultiSelect.jsx";
 import { computeSalesDashboard } from "../lib/salesDashboard.js";
 import { money, debtColor } from "../lib/format.js";
 import DataTable from "../components/table/DataTable.jsx";
+import Modal from "../components/common/Modal.jsx";
 
 const PAGE_SIZE = 20;
 const TYPE_COLORS = ["#2563eb", "#7c3aed", "#ea580c", "#16a34a", "#db2777", "#0284c7"];
@@ -96,8 +97,11 @@ const CHART_MODES = [
   { id: 2, title: "Cột chồng: chia 3 khúc theo loại" },
   { id: 3, title: "Cột nhóm: tách 3 cột theo loại" },
   { id: 4, title: "Đường xu hướng từng loại" },
-  { id: 5, title: "Tỉ trọng % từng loại" }
+  { id: 5, title: "Tỉ trọng % từng loại" },
+  { id: 6, title: "Nến: doanh số từng ngày trong tháng (mở/cao/thấp/đóng)" }
 ];
+const CANDLE_UP = "#16a34a";
+const CANDLE_DOWN = "#ef4444";
 const CHART_MODE_KEY = "dash_chart_mode";
 
 const readChartMode = () => {
@@ -116,7 +120,59 @@ const percentOf = (row, key) => {
   return total > 0 ? (Math.max(0, row[key] || 0) / total) * 100 : 0;
 };
 
+// Nến vẽ bằng 2 lớp cột lơ lửng chồng lên nhau: râu mảnh (thấp → cao) và thân (mở → đóng).
+function buildCandleConfig(rows) {
+  const labels = rows.map((r) => r.month);
+  const color = (r) => (r.candle && r.candle.close >= r.candle.open ? CANDLE_UP : CANDLE_DOWN);
+  const highest = Math.max(1, ...rows.map((r) => r.candle?.high || 0));
+  const body = (c) => {
+    const bottom = Math.min(c.open, c.close);
+    const top = Math.max(c.open, c.close);
+    return [bottom, top === bottom ? top + highest * 0.004 : top]; // mở = đóng vẫn hiện một vạch
+  };
+  return {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [
+        { label: "Râu", data: rows.map((r) => (r.candle ? [r.candle.low, r.candle.high] : null)), backgroundColor: rows.map(color), grouped: false, barPercentage: 0.06, categoryPercentage: 1 },
+        { label: "Thân", data: rows.map((r) => (r.candle ? body(r.candle) : null)), backgroundColor: rows.map(color), grouped: false, barPercentage: 0.5, categoryPercentage: 1, borderRadius: 2 }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          filter: (item) => item.datasetIndex === 1,
+          callbacks: {
+            label: (ctx) => {
+              const r = rows[ctx.dataIndex];
+              const c = r.candle;
+              if (!c) return "Không có ngày bán";
+              const change = c.open ? ((c.close - c.open) / Math.abs(c.open)) * 100 : 0;
+              return [
+                `Mở (ngày ${c.openDay}): ${money(c.open)}`,
+                `Cao nhất (ngày ${c.highDay}): ${money(c.high)}`,
+                `Thấp nhất (ngày ${c.lowDay}): ${money(c.low)}`,
+                `Đóng (ngày ${c.closeDay}): ${money(c.close)} (${change >= 0 ? "+" : ""}${change.toFixed(1)}% so với mở)`
+              ];
+            },
+            footer: (items) => {
+              const r = rows[items[0].dataIndex];
+              return r.candle ? [`Tổng tháng: ${money(r.s)}`, `${r.candle.days} ngày có bán · TB ${money(Math.round(r.s / r.candle.days))}/ngày`] : [];
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
 function buildChartConfig(rows, mode) {
+  if (mode === 6) return buildCandleConfig(rows);
   const labels = rows.map((r) => r.month);
   if (mode === 1) {
     return {
@@ -170,6 +226,17 @@ function buildChartConfig(rows, mode) {
   };
 }
 
+function ChartModeButtons({ mode, onPick }) {
+  return (
+    <div className="cs-segment" role="group" aria-label="Kiểu biểu đồ">
+      {CHART_MODES.map((m) => (
+        <button key={m.id} type="button" title={m.title} aria-label={m.title} aria-pressed={mode === m.id}
+          className={mode === m.id ? "active" : ""} onClick={() => onPick(m.id)}>{m.id}</button>
+      ))}
+    </div>
+  );
+}
+
 function MonthChart({ rows, mode }) {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -203,8 +270,13 @@ export default function SalesDashboardTab() {
     [data, nvOptions, month, nvs, khs]
   );
 
-  const chartRows = useMemo(() => stats.monthRows.slice().reverse(), [stats.monthRows]);
+  // Bỏ các tháng không có doanh số (chỉ có công nợ) khỏi biểu đồ.
+  const chartRows = useMemo(
+    () => stats.monthRows.slice().reverse().filter((r) => r.s || r.thuong || r.chinh || r.r1),
+    [stats.monthRows]
+  );
   const [chartMode, setChartMode] = useState(readChartMode);
+  const [chartZoom, setChartZoom] = useState(false);
   const pickChartMode = (mode) => {
     setChartMode(mode);
     try { localStorage.setItem(CHART_MODE_KEY, String(mode)); } catch { }
@@ -277,15 +349,21 @@ export default function SalesDashboardTab() {
         </div>
         <div className="card" style={{ padding: 16 }}>
           <div className="chart-head">
-            <h3>Doanh số theo tháng</h3>
-            <div className="cs-segment" role="group" aria-label="Kiểu biểu đồ">
-              {CHART_MODES.map((m) => (
-                <button key={m.id} type="button" title={m.title} aria-label={m.title} aria-pressed={chartMode === m.id}
-                  className={chartMode === m.id ? "active" : ""} onClick={() => pickChartMode(m.id)}>{m.id}</button>
-              ))}
+            <div className="chart-title">
+              <h3>Doanh số theo tháng</h3>
+              <button type="button" className="icon-btn chart-zoom" title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ" onClick={() => setChartZoom(true)}>
+                <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
+              </button>
             </div>
+            <ChartModeButtons mode={chartMode} onPick={pickChartMode} />
           </div>
           <div style={{ height: 260 }}><MonthChart rows={chartRows} mode={chartMode} /></div>
+          {chartZoom && (
+            <Modal title="Doanh số theo tháng" subtitle={CHART_MODES.find((m) => m.id === chartMode)?.title} onClose={() => setChartZoom(false)} width={1400}>
+              <div className="chart-head" style={{ justifyContent: "flex-end" }}><ChartModeButtons mode={chartMode} onPick={pickChartMode} /></div>
+              <div style={{ height: "min(68vh, 680px)" }}><MonthChart rows={chartRows} mode={chartMode} /></div>
+            </Modal>
+          )}
         </div>
       </div>
 

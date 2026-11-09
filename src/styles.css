@@ -2744,3 +2744,30 @@ tbody tr.dt-selected:hover {
   margin: 0;
   font-size: 14px
 }
+
+.chart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px
+}
+
+.icon-btn.chart-zoom {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px
+}
+
+.icon-btn.chart-zoom:hover {
+  background: var(--brand-soft);
+  color: var(--brand-600)
+}
+
+.icon-btn.chart-zoom svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round
+}
