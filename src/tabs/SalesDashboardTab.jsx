@@ -98,11 +98,27 @@ const CHART_MODES = [
   { id: 3, title: "Cột nhóm: tách 3 cột theo loại" },
   { id: 4, title: "Đường xu hướng từng loại" },
   { id: 5, title: "Tỉ trọng % từng loại" },
-  { id: 6, title: "Nến: doanh số từng ngày trong tháng (mở/cao/thấp/đóng)" }
+  { id: 6, title: "Nến: so với kỳ trước, đường trung bình và số đơn" }
 ];
 const CANDLE_UP = "#16a34a";
 const CANDLE_DOWN = "#ef4444";
 const CHART_MODE_KEY = "dash_chart_mode";
+
+const CHART_UNIT_KEY = "dash_chart_unit";
+const readChartUnit = () => {
+  try { return localStorage.getItem(CHART_UNIT_KEY) === "day" ? "day" : "month"; } catch { return "month"; }
+};
+
+function ChartUnitButtons({ unit, onPick }) {
+  return (
+    <div className="cs-segment" role="group" aria-label="Xem theo">
+      {[["day", "Ngày"], ["month", "Tháng"]].map(([value, label]) => (
+        <button key={value} type="button" aria-pressed={unit === value} className={unit === value ? "active" : ""}
+          title={`Xem theo ${label.toLowerCase()}`} onClick={() => onPick(value)}>{label}</button>
+      ))}
+    </div>
+  );
+}
 
 const readChartMode = () => {
   try {
@@ -120,49 +136,70 @@ const percentOf = (row, key) => {
   return total > 0 ? (Math.max(0, row[key] || 0) / total) * 100 : 0;
 };
 
-// Nến vẽ bằng 2 lớp cột lơ lửng chồng lên nhau: râu mảnh (thấp → cao) và thân (mở → đóng).
-function buildCandleConfig(rows) {
-  const labels = rows.map((r) => r.month);
-  const color = (r) => (r.candle && r.candle.close >= r.candle.open ? CANDLE_UP : CANDLE_DOWN);
-  const highest = Math.max(1, ...rows.map((r) => r.candle?.high || 0));
-  const body = (c) => {
-    const bottom = Math.min(c.open, c.close);
-    const top = Math.max(c.open, c.close);
-    return [bottom, top === bottom ? top + highest * 0.004 : top]; // mở = đóng vẫn hiện một vạch
+// Số tiền gọn cho trục: 1,2 tỷ / 850 tr.
+const compactMoney = (value) => {
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return `${(value / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`;
+  if (abs >= 1e6) return `${Math.round(value / 1e6).toLocaleString("vi-VN")} tr`;
+  return value.toLocaleString("vi-VN");
+};
+
+// Nến kiểu chứng khoán: mỗi kỳ (ngày/tháng) một cây nến, thân đi từ doanh số kỳ trước (mở)
+// tới doanh số kỳ này (đóng) — xanh nếu tăng, đỏ nếu giảm. Kèm đường trung bình động
+// (7 ngày / 3 tháng) và cột số đơn ở phía dưới.
+function buildCandleConfig(rows, unit) {
+  const labels = rows.map((r) => r.label);
+  const windowSize = unit === "day" ? 7 : 3;
+  const points = rows.map((r, i) => {
+    const open = i > 0 ? rows[i - 1].s : r.s;
+    const from = i - windowSize + 1;
+    const ma = from >= 0 ? rows.slice(from, i + 1).reduce((sum, x) => sum + x.s, 0) / windowSize : null;
+    return { open, close: r.s, up: r.s >= open, ma };
+  });
+  const span = Math.max(1, ...rows.map((r) => Math.abs(r.s)));
+  const body = (p) => {
+    const bottom = Math.min(p.open, p.close);
+    const top = Math.max(p.open, p.close);
+    return [bottom, top - bottom < span * 0.004 ? bottom + span * 0.004 : top]; // không đổi vẫn hiện một vạch
   };
+  const unitName = unit === "day" ? "Ngày" : "Tháng";
   return {
     type: "bar",
     data: {
       labels,
       datasets: [
-        { label: "Râu", data: rows.map((r) => (r.candle ? [r.candle.low, r.candle.high] : null)), backgroundColor: rows.map(color), grouped: false, barPercentage: 0.06, categoryPercentage: 1 },
-        { label: "Thân", data: rows.map((r) => (r.candle ? body(r.candle) : null)), backgroundColor: rows.map(color), grouped: false, barPercentage: 0.5, categoryPercentage: 1, borderRadius: 2 }
+        { label: "Doanh số", data: points.map(body), backgroundColor: points.map((p) => (p.up ? CANDLE_UP : CANDLE_DOWN)), yAxisID: "y", order: 2, grouped: false, barPercentage: 0.7, categoryPercentage: 0.9, borderRadius: 1 },
+        { type: "line", label: `TB ${windowSize} ${unit === "day" ? "ngày" : "tháng"}`, data: points.map((p) => p.ma), borderColor: "#f59e0b", backgroundColor: "#f59e0b", borderWidth: 2, pointRadius: 0, tension: 0.3, yAxisID: "y", order: 1, spanGaps: true },
+        { label: "Số đơn", data: rows.map((r) => r.c), backgroundColor: points.map((p) => (p.up ? "rgba(22,163,74,.35)" : "rgba(239,68,68,.35)")), yAxisID: "yv", order: 3, barPercentage: 0.7, categoryPercentage: 0.9 }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkipPadding: 12 } },
+        y: { stack: "candle", stackWeight: 3, position: "right", beginAtZero: false, grace: "5%", ticks: { callback: (value) => compactMoney(value) } },
+        yv: { stack: "candle", stackWeight: 1, position: "right", beginAtZero: true, grid: { display: false }, ticks: { maxTicksLimit: 3 }, title: { display: true, text: "Số đơn", font: { size: 11 } } }
+      },
       plugins: {
-        legend: { display: false },
+        legend: { position: "bottom", labels: { boxWidth: 12, boxHeight: 12, filter: (item) => item.datasetIndex !== 0 } },
         tooltip: {
-          filter: (item) => item.datasetIndex === 1,
+          filter: (item) => item.datasetIndex === 0,
           callbacks: {
+            title: (items) => `${unitName} ${rows[items[0].dataIndex].fullLabel || rows[items[0].dataIndex].label}`,
             label: (ctx) => {
               const r = rows[ctx.dataIndex];
-              const c = r.candle;
-              if (!c) return "Không có ngày bán";
-              const change = c.open ? ((c.close - c.open) / Math.abs(c.open)) * 100 : 0;
-              return [
-                `Mở (ngày ${c.openDay}): ${money(c.open)}`,
-                `Cao nhất (ngày ${c.highDay}): ${money(c.high)}`,
-                `Thấp nhất (ngày ${c.lowDay}): ${money(c.low)}`,
-                `Đóng (ngày ${c.closeDay}): ${money(c.close)} (${change >= 0 ? "+" : ""}${change.toFixed(1)}% so với mở)`
+              const p = points[ctx.dataIndex];
+              const change = ctx.dataIndex > 0 && p.open ? ((p.close - p.open) / Math.abs(p.open)) * 100 : null;
+              const lines = [
+                `Doanh số: ${money(r.s)}${change === null ? "" : ` (${change >= 0 ? "+" : ""}${change.toFixed(1)}%)`}`,
+                ctx.dataIndex > 0 ? `${unit === "day" ? "Ngày bán trước" : "Tháng trước"}: ${money(p.open)}` : "Kỳ đầu tiên",
+                `TB ${windowSize} ${unit === "day" ? "ngày" : "tháng"}: ${p.ma === null ? "chưa đủ dữ liệu" : money(Math.round(p.ma))}`,
+                `Số đơn: ${r.c}`
               ];
-            },
-            footer: (items) => {
-              const r = rows[items[0].dataIndex];
-              return r.candle ? [`Tổng tháng: ${money(r.s)}`, `${r.candle.days} ngày có bán · TB ${money(Math.round(r.s / r.candle.days))}/ngày`] : [];
+              if (r.candle) lines.push(`Ngày bán cao nhất: ${r.candle.highDay} (${money(r.candle.high)})`, `Ngày bán thấp nhất: ${r.candle.lowDay} (${money(r.candle.low)})`);
+              return lines;
             }
           }
         }
@@ -171,9 +208,9 @@ function buildCandleConfig(rows) {
   };
 }
 
-function buildChartConfig(rows, mode) {
-  if (mode === 6) return buildCandleConfig(rows);
-  const labels = rows.map((r) => r.month);
+function buildChartConfig(rows, mode, unit) {
+  if (mode === 6) return buildCandleConfig(rows, unit);
+  const labels = rows.map((r) => r.label);
   if (mode === 1) {
     return {
       type: "bar",
@@ -237,12 +274,12 @@ function ChartModeButtons({ mode, onPick }) {
   );
 }
 
-function MonthChart({ rows, mode }) {
+function MonthChart({ rows, mode, unit }) {
   const canvasRef = useRef(null);
   useEffect(() => {
-    const chart = new Chart(canvasRef.current, buildChartConfig(rows, mode));
+    const chart = new Chart(canvasRef.current, buildChartConfig(rows, mode, unit));
     return () => chart.destroy();
-  }, [rows, mode]);
+  }, [rows, mode, unit]);
   return <canvas ref={canvasRef} />;
 }
 
@@ -271,9 +308,16 @@ export default function SalesDashboardTab() {
   );
 
   // Bỏ các tháng không có doanh số (chỉ có công nợ) khỏi biểu đồ.
+  const [chartUnit, setChartUnit] = useState(readChartUnit);
+  const pickChartUnit = (unit) => {
+    setChartUnit(unit);
+    try { localStorage.setItem(CHART_UNIT_KEY, unit); } catch { }
+  };
   const chartRows = useMemo(
-    () => stats.monthRows.slice().reverse().filter((r) => r.s || r.thuong || r.chinh || r.r1),
-    [stats.monthRows]
+    () => (chartUnit === "day"
+      ? stats.dayRows
+      : stats.monthRows.slice().reverse().filter((r) => r.s || r.thuong || r.chinh || r.r1).map((r) => ({ ...r, label: r.month }))),
+    [stats.monthRows, stats.dayRows, chartUnit]
   );
   const [chartMode, setChartMode] = useState(readChartMode);
   const [chartZoom, setChartZoom] = useState(false);
@@ -350,18 +394,19 @@ export default function SalesDashboardTab() {
         <div className="card" style={{ padding: 16 }}>
           <div className="chart-head">
             <div className="chart-title">
-              <h3>Doanh số theo tháng</h3>
+              <h3>Doanh số theo {chartUnit === "day" ? "ngày" : "tháng"}</h3>
+              <ChartUnitButtons unit={chartUnit} onPick={pickChartUnit} />
               <button type="button" className="icon-btn chart-zoom" title="Phóng to biểu đồ" aria-label="Phóng to biểu đồ" onClick={() => setChartZoom(true)}>
                 <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
               </button>
             </div>
             <ChartModeButtons mode={chartMode} onPick={pickChartMode} />
           </div>
-          <div style={{ height: 260 }}><MonthChart rows={chartRows} mode={chartMode} /></div>
+          <div style={{ height: 260 }}><MonthChart rows={chartRows} mode={chartMode} unit={chartUnit} /></div>
           {chartZoom && (
-            <Modal title="Doanh số theo tháng" subtitle={CHART_MODES.find((m) => m.id === chartMode)?.title} onClose={() => setChartZoom(false)} width={1400}>
-              <div className="chart-head" style={{ justifyContent: "flex-end" }}><ChartModeButtons mode={chartMode} onPick={pickChartMode} /></div>
-              <div style={{ height: "min(68vh, 680px)" }}><MonthChart rows={chartRows} mode={chartMode} /></div>
+            <Modal title={`Doanh số theo ${chartUnit === "day" ? "ngày" : "tháng"}`} subtitle={CHART_MODES.find((m) => m.id === chartMode)?.title} onClose={() => setChartZoom(false)} width={1400}>
+              <div className="chart-head"><ChartUnitButtons unit={chartUnit} onPick={pickChartUnit} /><ChartModeButtons mode={chartMode} onPick={pickChartMode} /></div>
+              <div style={{ height: "min(68vh, 680px)" }}><MonthChart rows={chartRows} mode={chartMode} unit={chartUnit} /></div>
             </Modal>
           )}
         </div>

@@ -36,6 +36,24 @@ function dailyCandle(days) {
   };
 }
 
+// Doanh số, số đơn và 3 loại SP theo từng ngày có bán, ngày tăng dần.
+function buildDayRows(salesByDay, typesByDay) {
+  return [...new Set([...Object.keys(salesByDay), ...Object.keys(typesByDay)])]
+    .filter((key) => /^\d{8}$/.test(key))
+    .sort()
+    .map((key) => {
+      const { s = 0, c = 0 } = salesByDay[key] || {};
+      const types = typesByDay[key] || { thuong: 0, chinh: 0, r1: 0 };
+      return {
+        key,
+        label: `${key.slice(6, 8)}/${key.slice(4, 6)}`,
+        fullLabel: `${key.slice(6, 8)}/${key.slice(4, 6)}/${key.slice(0, 4)}`,
+        s, c, ...types,
+        khac: s - types.thuong - types.chinh - types.r1
+      };
+    });
+}
+
 const newNvStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, chiCM: 0, thuCM: 0, chiLM: 0, luyKe: 0 });
 const newKhStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, luyKe: 0 });
 
@@ -70,6 +88,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
   // Doanh số theo loại SP (chính/thường/...) từ DH_CT; bỏ qua dòng chưa phân loại.
   const typeTotals = {};
   const typesByMonth = {};
+  const typesByDay = {};
   data.DH_CT.filter((item) => matchesFilters(item, "npp")).forEach((item) => {
     const amount = Number(item.thanh_tien || 0);
     const productType = normalizeProductType(item.sp_chinh_thuong);
@@ -77,6 +96,9 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
       const m = toMonthLabel(item.ngay);
       if (!typesByMonth[m]) typesByMonth[m] = { thuong: 0, chinh: 0, r1: 0 };
       typesByMonth[m][productType] += amount;
+      const dayKey = parseDateSort(item.ngay);
+      if (!typesByDay[dayKey]) typesByDay[dayKey] = { thuong: 0, chinh: 0, r1: 0 };
+      typesByDay[dayKey][productType] += amount;
     }
     const type = String(item.sp_chinh_thuong || "").trim().toUpperCase();
     if (!type) return;
@@ -91,6 +113,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
   const effectiveMonth = month || currentYearMonth();
   const lastMonth = prevMonth(effectiveMonth);
   const salesByMonth = {};
+  const salesByDay = {};
   orders.forEach((d) => {
     const m = toMonthLabel(d.ngay);
     if (!salesByMonth[m]) salesByMonth[m] = { c: 0, s: 0, days: {} };
@@ -98,6 +121,9 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
     salesByMonth[m].s += Number(d.thanh_tien || 0);
     const day = parseDateSort(d.ngay);
     salesByMonth[m].days[day] = (salesByMonth[m].days[day] || 0) + Number(d.thanh_tien || 0);
+    if (!salesByDay[day]) salesByDay[day] = { s: 0, c: 0 };
+    salesByDay[day].s += Number(d.thanh_tien || 0);
+    salesByDay[day].c++;
 
     const n = d.id_nv || "N/A";
     if (!nvStats[n]) nvStats[n] = newNvStats();
@@ -217,6 +243,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
     totalIncurred,
     totalCollected,
     monthRows: monthsDesc.map((m) => ({ month: m, ...monthStats[m] })),
+    dayRows: buildDayRows(salesByDay, typesByDay),
     nvRows: nvKeys.map((id) => ({ id, ...nvStats[id] })),
     khRows: khKeys.map((id) => ({ id, ...khStats[id] })),
     nccRows,
