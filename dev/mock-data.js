@@ -22,15 +22,15 @@ export const seed = {
     { id: "KH03", ten_kh: "Siêu thị Hòa Bình", dien_thoai: "0901000003", dia_chi: "TP.HCM", nv_quan_ly: "NV02", kenh: "Đại lý", tt: "Hoạt động" }
   ]),
   DS_SP: table("DS_SP", [
-    { id: "SP01", ten_sp: "Khóa vân tay LK-100", model: "LK-100", ncc: "Lock&King", gia_ban: 3500000, sp_chinh_thuong: "chinh" },
-    { id: "SP02", ten_sp: "Khóa thẻ từ LK-200", model: "LK-200", ncc: "Lock&King", gia_ban: 2200000, sp_chinh_thuong: "thuong" },
-    { id: "SP03", ten_sp: "Chuông cửa R1", model: "R1-01", ncc: "Đối tác", gia_ban: 900000, sp_chinh_thuong: "r1" }
+    { id: "SP01", ten_sp: "Khóa vân tay LK-100", model: "LK-100", ncc: "Lock&King", gia_ban: 3500000, sp_chinh_thuong: "CHÍNH" },
+    { id: "SP02", ten_sp: "Khóa thẻ từ LK-200", model: "LK-200", ncc: "Lock&King", gia_ban: 2200000, sp_chinh_thuong: "THƯỜNG" },
+    { id: "SP03", ten_sp: "Chuông cửa R1", model: "R1-01", ncc: "Đối tác", gia_ban: 900000, sp_chinh_thuong: "R1" }
   ]),
   DH_CT: table("DH_CT", [
-    { id: "CT01", id_dh: "DH01", ngay: "2026-09-05", npp: "KH01", id_nv: "NV01", id_sp: "SP01", don_gia: 3500000, slg: 4, thanh_tien: 14000000, ncc: "Lock&King", sp_chinh_thuong: "chinh" },
-    { id: "CT02", id_dh: "DH01", ngay: "2026-09-05", npp: "KH01", id_nv: "NV01", id_sp: "SP02", don_gia: 2200000, slg: 5, thanh_tien: 11000000, ncc: "Lock&King", sp_chinh_thuong: "thuong" },
-    { id: "CT03", id_dh: "DH02", ngay: "2026-10-02", npp: "KH02", id_nv: "NV01", id_sp: "SP03", don_gia: 900000, slg: 10, thanh_tien: 9000000, ncc: "Đối tác", sp_chinh_thuong: "r1" },
-    { id: "CT04", id_dh: "DH03", ngay: "2026-10-08", npp: "KH03", id_nv: "NV02", id_sp: "SP01", don_gia: 3500000, slg: 6, thanh_tien: 21000000, ncc: "Lock&King", sp_chinh_thuong: "chinh" }
+    { id: "CT01", id_dh: "DH01", ngay: "2026-09-05", npp: "KH01", id_nv: "NV01", id_sp: "SP01", don_gia: 3500000, slg: 4, thanh_tien: 14000000, ncc: "Lock&King", sp_chinh_thuong: "CHÍNH" },
+    { id: "CT02", id_dh: "DH01", ngay: "2026-09-05", npp: "KH01", id_nv: "NV01", id_sp: "SP02", don_gia: 2200000, slg: 5, thanh_tien: 11000000, ncc: "Lock&King", sp_chinh_thuong: "THƯỜNG" },
+    { id: "CT03", id_dh: "DH02", ngay: "2026-10-02", npp: "KH02", id_nv: "NV01", id_sp: "SP03", don_gia: 900000, slg: 10, thanh_tien: 9000000, ncc: "Đối tác", sp_chinh_thuong: "R1" },
+    { id: "CT04", id_dh: "DH03", ngay: "2026-10-08", npp: "KH03", id_nv: "NV02", id_sp: "SP01", don_gia: 3500000, slg: 6, thanh_tien: 21000000, ncc: "Lock&King", sp_chinh_thuong: "CHÍNH" }
   ]),
   KPI: table("KPI", []),
   CONG_NO: table("CONG_NO", [

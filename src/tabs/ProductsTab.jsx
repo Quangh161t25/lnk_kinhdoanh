@@ -48,7 +48,7 @@ export default function ProductsTab() {
     { key: "ten_sp", label: "Tên SP", style: { fontWeight: 600, color: "var(--text-main)" }, render: (item) => <Highlight text={item.ten_sp} query={search} /> },
     { key: "model", label: "Model", render: (item) => <Highlight text={item.model} query={search} /> },
     { key: "ncc", label: "NCC", render: (item) => <Highlight text={item.ncc} query={search} /> },
-    { key: "gia_ban", label: "Giá bán", align: "right", sortValue: (item) => Number(item.gia_ban || 0), render: (item) => <strong style={{ color: "var(--brand)" }}>{money(item.gia_ban)}</strong> },
+    { key: "gia_ban", label: "Giá bán", align: "right", sortValue: (item) => Number(item.gia_ban || 0), render: (item) => (String(item.gia_ban ?? "").trim() === "" ? <span style={{ color: "var(--muted)" }} title="Chưa có giá bán">—</span> : <strong style={{ color: "var(--brand)" }}>{money(item.gia_ban)}</strong>) },
     { key: "sp_chinh_thuong", label: "Loại SP", align: "center", render: (item) => <TypeBadge value={item.sp_chinh_thuong} /> }
   ];
 
@@ -101,10 +101,13 @@ export default function ProductsTab() {
   );
 }
 
-const PRODUCT_TYPES = [["", "— Không đổi —"], ["chinh", "Chính"], ["thuong", "Thường"], ["r1", "R1"]];
-const TYPE_LABELS = { chinh: "Chính", thuong: "Thường", r1: "R1" };
+// Loại SP ghi vào sheet bằng chữ hoa có dấu, giống dữ liệu sẵn có: CHÍNH / THƯỜNG / R1.
+const PRODUCT_TYPES = [["", "— Không đổi —"], ["CHÍNH", "CHÍNH"], ["THƯỜNG", "THƯỜNG"], ["R1", "R1"]];
+const TYPE_LABELS = { chinh: "CHÍNH", thuong: "THƯỜNG", r1: "R1" };
 const TYPE_COLORS = { chinh: ["#e0e7ff", "#3730a3"], thuong: ["#f3e8ff", "#6b21a8"], r1: ["#e0f2fe", "#0369a1"] };
 const typeKey = (value) => removeDiacritics(value).toLowerCase().trim();
+// "chinh", "Chính", "CHINH"… → "CHÍNH"; giá trị lạ giữ nguyên.
+const canonicalType = (value) => TYPE_LABELS[typeKey(value)] || String(value || "").trim();
 
 // Nhãn loại SP: chinh → "Chính", thuong → "Thường", r1 → "R1"; giá trị lạ thì hiện nguyên văn.
 function TypeBadge({ value }) {
@@ -214,13 +217,25 @@ function ProductForm({ productId }) {
   const drawer = useDrawer();
   const [form, setForm] = useState(() => {
     const item = data.DS_SP.find((row) => row.id === productId) || {};
-    return { id: item.id || randomId("SP"), ten_sp: item.ten_sp || "", model: item.model || "", ncc: item.ncc || "", gia_ban: item.gia_ban || "", sp_chinh_thuong: item.sp_chinh_thuong || "" };
+    return { id: item.id || randomId("SP"), ten_sp: item.ten_sp || "", model: item.model || "", ncc: item.ncc || "", gia_ban: item.gia_ban || "", sp_chinh_thuong: canonicalType(item.sp_chinh_thuong) };
   });
   const bind = (name) => ({ name, value: form[name], onChange: (e) => setForm((f) => ({ ...f, [name]: e.target.value })) });
 
+  // Gợi ý NCC từ những NCC đã nhập trước, NCC dùng nhiều nhất lên đầu.
+  const nccSuggestions = useMemo(() => {
+    const counts = new Map();
+    data.DS_SP.forEach((p) => {
+      const name = String(p.ncc || "").trim();
+      if (name) counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "vi")).map(([name]) => name);
+  }, [data.DS_SP]);
+
   async function handleSubmit(event) {
     event.preventDefault();
-    const record = { id: String(form.id).trim(), ten_sp: String(form.ten_sp).trim(), model: String(form.model || "").trim(), ncc: String(form.ncc || "").trim(), gia_ban: Number(form.gia_ban || 0), sp_chinh_thuong: String(form.sp_chinh_thuong || "").trim() };
+    // Giá bán không bắt buộc: để trống thì ô giá trên sheet cũng để trống.
+    const price = String(form.gia_ban ?? "").trim();
+    const record = { id: String(form.id).trim(), ten_sp: String(form.ten_sp).trim(), model: String(form.model || "").trim(), ncc: String(form.ncc || "").trim(), gia_ban: price === "" ? "" : Number(price), sp_chinh_thuong: canonicalType(form.sp_chinh_thuong) };
     if (await saveRecord("DS_SP", record, { addedMessage: "Đã thêm sản phẩm mới.", updatedMessage: "Đã cập nhật sản phẩm." })) drawer.close();
   }
 
@@ -229,7 +244,11 @@ function ProductForm({ productId }) {
       <div className="field"><label>ID</label><input {...bind("id")} readOnly={!!productId} required /></div>
       <div className="field full"><label>Tên sản phẩm</label><input {...bind("ten_sp")} required /></div>
       <div className="field"><label>Model</label><input {...bind("model")} /></div>
-      <div className="field"><label>NCC</label><input {...bind("ncc")} /></div>
+      <div className="field">
+        <label>NCC</label>
+        <input {...bind("ncc")} list="product-form-ncc" autoComplete="off" placeholder="Gõ hoặc chọn NCC đã có" />
+        <datalist id="product-form-ncc">{nccSuggestions.map((name) => <option key={name} value={name} />)}</datalist>
+      </div>
       <div className="field">
         <label>Loại SP (sp_chinh_thuong)</label>
         <select {...bind("sp_chinh_thuong")}>
@@ -238,7 +257,7 @@ function ProductForm({ productId }) {
           {form.sp_chinh_thuong && !TYPE_LABELS[typeKey(form.sp_chinh_thuong)] && <option value={form.sp_chinh_thuong}>{form.sp_chinh_thuong}</option>}
         </select>
       </div>
-      <div className="field"><label>Giá bán</label><input type="number" {...bind("gia_ban")} min="0" required style={{ fontSize: 15, fontWeight: 600, color: "var(--brand)" }} /></div>
+      <div className="field"><label>Giá bán <span style={{ color: "var(--muted)", fontWeight: 400 }}>(không bắt buộc)</span></label><input type="number" {...bind("gia_ban")} min="0" placeholder="Để trống nếu chưa có giá" style={{ fontSize: 15, fontWeight: 600, color: "var(--brand)" }} /></div>
       <div className="button-row full" style={{ marginTop: 12 }}><button className="btn btn-primary" type="submit" style={{ width: "100%" }}>Lưu Sản phẩm</button></div>
     </form>
   );

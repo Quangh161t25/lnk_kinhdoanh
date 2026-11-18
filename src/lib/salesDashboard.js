@@ -54,6 +54,8 @@ function buildDayRows(salesByDay, typesByDay) {
     });
 }
 
+const TYPE_NAMES = { chinh: "CHÍNH", thuong: "THƯỜNG", r1: "R1" };
+
 const newNvStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, chiCM: 0, thuCM: 0, chiLM: 0, luyKe: 0 });
 const newKhStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, luyKe: 0 });
 
@@ -100,7 +102,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
       if (!typesByDay[dayKey]) typesByDay[dayKey] = { thuong: 0, chinh: 0, r1: 0 };
       typesByDay[dayKey][productType] += amount;
     }
-    const type = String(item.sp_chinh_thuong || "").trim().toUpperCase();
+    const type = TYPE_NAMES[productType] || String(item.sp_chinh_thuong || "").trim().toUpperCase();
     if (!type) return;
     typeTotals[type] = (typeTotals[type] || 0) + amount;
   });
