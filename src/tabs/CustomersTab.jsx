@@ -102,6 +102,8 @@ export default function CustomersTab() {
       <DataTable
         id="customers"
         name="Khách hàng"
+        pageSize={25}
+        pageNoun="khách hàng"
         selection={{ keyOf: ({ item }) => item.id, selected, onChange: setSelected }}
         columns={CUSTOMER_COLUMNS}
         rows={rows}

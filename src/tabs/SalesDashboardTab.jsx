@@ -7,7 +7,7 @@ import { money, debtColor } from "../lib/format.js";
 import DataTable from "../components/table/DataTable.jsx";
 import Modal from "../components/common/Modal.jsx";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 25;
 const TYPE_COLORS = ["#2563eb", "#7c3aed", "#ea580c", "#16a34a", "#db2777", "#0284c7"];
 const CARD = { padding: "12px 14px", border: "none", boxShadow: "0 2px 8px rgba(0,0,0,.04)" };
 const CARD_LABEL = { color: "var(--muted)", fontWeight: 700, fontSize: 10 };

@@ -164,6 +164,8 @@ export default function DebtsTab() {
       <DataTable
         id="debts"
         name="Công nợ"
+        pageSize={25}
+        pageNoun="phiếu"
         columns={[
           { key: "id", label: "ID", className: "mono", render: (item) => item.id },
           { key: "ngay", label: "Ngày", render: (item) => formatDateVi(item.ngay) },

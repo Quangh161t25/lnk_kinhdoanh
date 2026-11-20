@@ -11,7 +11,6 @@ import Modal, { SelectionBar } from "../components/common/Modal.jsx";
 import MultiValueFilter, { makeTokenMatcher } from "../components/common/MultiValueFilter.jsx";
 import { usePersistentState } from "../store/persistentState.js";
 
-const MAX_ROWS = 150;
 const EMPTY_PICK = { text: "", value: "" };
 const EMPTY_FILTERS = { search: "", nv: EMPTY_PICK, sp: [], npp: [], from: "", to: "" };
 
@@ -231,7 +230,7 @@ export default function OrderDetailsTab() {
           { key: "thanh_tien", label: "Thành tiền", align: "right", render: (item) => <strong style={{ color: "var(--brand)" }}>{money(item.thanh_tien)}</strong>, footer: money(sumTotal), footerStyle: { color: "var(--brand)" } }
         ]}
         rows={rows}
-        limit={MAX_ROWS}
+        pageSize={25}
         rowKey={(item, index) => `${item.id}-${index}`}
         rowProps={(item) => ({ "data-action": "view-order-detail", style: { cursor: "pointer" }, onDoubleClick: () => openOrderDrawer(drawer, data, item.id_dh) })}
         empty="Không tìm thấy chi tiết đơn hàng."

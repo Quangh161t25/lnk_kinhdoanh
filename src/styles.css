@@ -2771,3 +2771,80 @@ tbody tr.dt-selected:hover {
   stroke-linecap: round;
   stroke-linejoin: round
 }
+
+/* Thanh phân trang của bảng */
+.pager-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 4px 0;
+  font-size: 13px;
+  color: var(--muted)
+}
+
+.pager-info b {
+  color: var(--text);
+  font-weight: 600
+}
+
+.pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px
+}
+
+.pager-size select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer
+}
+
+.pager-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto
+}
+
+.pager-label {
+  margin-right: 4px
+}
+
+.pager-nav button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer
+}
+
+.pager-nav button:hover:not(:disabled) {
+  background: var(--soft);
+  border-color: var(--line-strong)
+}
+
+.pager-nav button.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff
+}
+
+.pager-nav button:disabled {
+  opacity: .4;
+  cursor: not-allowed
+}
+
+.pager-gap {
+  padding: 0 4px
+}

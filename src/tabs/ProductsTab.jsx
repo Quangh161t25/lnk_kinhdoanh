@@ -8,7 +8,6 @@ import { showToast } from "../components/Toast.jsx";
 import { replaceSheet } from "../store/data.js";
 import { money, randomId, removeDiacritics } from "../lib/format.js";
 
-const MAX_ROWS = 150; // chỉ vẽ 150 dòng đầu cho mượt với dữ liệu lớn
 const ADD_BUTTON_STYLE = { padding: "0 12px", fontSize: 20, borderRadius: 8, height: 32, display: "flex", alignItems: "center", justifyContent: "center" };
 const READONLY = { background: "var(--soft)" };
 
@@ -90,8 +89,8 @@ export default function ProductsTab() {
         name="Sản phẩm"
         columns={columns}
         rows={rows}
-        limit={MAX_ROWS}
-        limitNoun="sản phẩm"
+        pageSize={25}
+        pageNoun="sản phẩm"
         rowKey={(item, index) => `${item.id}-${index}`}
         rowProps={(item) => ({ "data-action": "view-product", style: { cursor: "pointer" }, onDoubleClick: () => openProductDrawer(drawer, data, item.id) })}
         empty="Không tìm thấy sản phẩm."

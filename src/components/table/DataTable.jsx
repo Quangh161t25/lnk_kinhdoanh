@@ -1,8 +1,8 @@
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTableSettings, resolveColumns, isCustomized } from "./tableSettings.js";
 import { sortRows } from "./sorting.js";
 import ColumnSettings from "./ColumnSettings.jsx";
-import Pagination, { paginate } from "../common/Pagination.jsx";
+import Pager, { paginate, PAGE_SIZES } from "./Pager.jsx";
 
 // Bảng dùng chung có nút "Tùy chỉnh cột": kéo thả thứ tự, ẩn/hiện, căn lề, độ rộng,
 // đổi tên, xuống dòng, chữ đậm, cố định cột, mật độ dòng, sọc vằn. Tùy chỉnh lưu theo `id`.
@@ -11,14 +11,16 @@ import Pagination, { paginate } from "../common/Pagination.jsx";
 //             render(row, i), headerStyle?, headerProps?, headerExtra?, footer?, footerStyle? }]
 // selection (tùy chọn): { keyOf(row), selected: Set<string>, onChange(nextSet) } → thêm cột ô chọn ở đầu bảng.
 // Bấm tiêu đề để sắp xếp (tăng → giảm → bỏ); cột tự sắp theo chữ hiển thị, hoặc theo sortValue(row) nếu có;
-// sortable: false để tắt. rows là TOÀN BỘ dòng: bảng tự sắp xếp rồi mới cắt theo limit hoặc phân trang
-// (pageSize + page + onPage + pageNoun), nhờ đó sắp xếp đúng trên cả danh sách chứ không chỉ trang đang xem.
+// sortable: false để tắt. rows là TOÀN BỘ dòng: bảng tự sắp xếp rồi mới phân trang, nhờ đó sắp xếp đúng
+// trên cả danh sách chứ không chỉ trang đang xem.
+// Phân trang: truyền pageSize (cỡ trang mặc định) để bật; người dùng đổi cỡ trang (25…500, Tất cả) và
+// lựa chọn được lưu theo bảng. page/onPage tùy chọn: không truyền thì bảng tự giữ trang hiện tại.
 const resolveStyle = (style, row, index) => (typeof style === "function" ? style(row, index) : style);
 
 export default function DataTable({
   id, name, columns, rows: allRows, rowKey, rowProps,
   empty = "Trống", after, footerLabel, footerRowStyle, selection,
-  limit, limitNoun = "dòng", pageSize, page = 1, onPage, pageNoun = "dòng",
+  pageSize, page: controlledPage, onPage: controlledOnPage, pageNoun = "dòng",
   wrapClassName = "table-wrap", wrapStyle, tableStyle, theadStyle, tfootStyle, toolbarStyle
 }) {
   const [settings, update, reset] = useTableSettings(id);
@@ -30,9 +32,20 @@ export default function DataTable({
   const sort = settings.sort;
   const sortColumn = sort ? all.find((c) => c.key === sort.key && c.sortable !== false) : null;
   const sorted = useMemo(() => sortRows(allRows, sortColumn, sortColumn && sort.dir), [allRows, sortColumn, sort?.dir]);
-  const paged = pageSize ? paginate(sorted, page, pageSize) : null;
-  const rows = paged ? paged.rows : limit ? sorted.slice(0, limit) : sorted;
-  const hiddenByLimit = !pageSize && limit && sorted.length > limit ? sorted.length - limit : 0;
+  const paging = pageSize !== undefined;
+  const [ownPage, setOwnPage] = useState(1);
+  const page = controlledPage ?? ownPage;
+  const onPage = controlledOnPage || setOwnPage;
+  const size = PAGE_SIZES.includes(settings.pageSize) ? settings.pageSize : pageSize;
+  // Danh sách đổi (lọc lại) thì về trang 1.
+  const rowCount = allRows.length;
+  useEffect(() => { if (!controlledPage) setOwnPage(1); }, [rowCount, controlledPage]);
+  const paged = paging ? paginate(sorted, page, size) : null;
+  const rows = paged ? paged.rows : sorted;
+  const changePageSize = (next) => {
+    update((s) => ({ ...s, pageSize: next }));
+    onPage(1);
+  };
 
   // Bấm tiêu đề: tăng dần → giảm dần → bỏ sắp xếp.
   const toggleSort = (column) => {
@@ -43,7 +56,7 @@ export default function DataTable({
       if (current.dir === "asc") return { ...rest, sort: { key: column.key, dir: "desc" } };
       return rest;
     });
-    if (pageSize && onPage) onPage(1);
+    if (paging) onPage(1);
   };
 
   const rowKeys = selection ? rows.map((row) => selection.keyOf(row)) : [];
@@ -192,11 +205,7 @@ export default function DataTable({
                 </tr>
               );
             })}
-            {(after || hiddenByLimit > 0) && (
-              <tr><td colSpan={span} style={{ textAlign: "center", padding: 12, color: "var(--muted)", fontSize: 13, background: "#f9fafb" }}>
-                {after || <>... và <strong>{hiddenByLimit.toLocaleString("vi-VN")}</strong> {limitNoun} khác (Hãy lọc chi tiết hơn)</>}
-              </td></tr>
-            )}
+            {after && <tr><td colSpan={span} style={{ textAlign: "center", padding: 12, color: "var(--muted)", fontSize: 13, background: "#f9fafb" }}>{after}</td></tr>}
           </tbody>
           {hasFooter && rows.length > 0 && (
             <tfoot style={tfootStyle}>
@@ -212,7 +221,10 @@ export default function DataTable({
           )}
         </table>
       </div>
-      {paged && <Pagination page={paged.page} pageSize={pageSize} totalRows={sorted.length} noun={pageNoun} onPage={onPage} />}
+      {paged && sorted.length > 0 && (
+        <Pager total={sorted.length} page={paged.page} totalPages={paged.totalPages} start={paged.start} shown={rows.length}
+          pageSize={size} noun={pageNoun} onPage={onPage} onPageSize={changePageSize} />
+      )}
       {open && (
         <ColumnSettings
           name={name}
