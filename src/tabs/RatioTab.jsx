@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useData } from "../store/DataContext.jsx";
 import { usePersistentState } from "../store/persistentState.js";
 import SearchDropdown from "../components/common/SearchDropdown.jsx";
-import { money, parseLooseNumber } from "../lib/format.js";
+import { money, normalizeProductType, parseLooseNumber } from "../lib/format.js";
 import DataTable from "../components/table/DataTable.jsx";
 
 const PAGE_SIZE = 50;
@@ -12,10 +12,10 @@ const FILTER_SELECT = { border: "none", outline: "none", fontSize: 13, backgroun
 const NO_FILTERS = { kh: "", khText: "", nv: "", kenh: "" };
 const SUMMARY_CELL = { padding: "10px 8px" };
 
-// Chỉ tính doanh thu hàng của hai nhà cung cấp này.
-const isAllowedNcc = (ncc) => {
-  const n = String(ncc || "").trim().toLowerCase();
-  return n === "lock&king" || n === "takin";
+// Chỉ tính doanh thu sản phẩm loại "THƯỜNG".
+const isThuongProduct = (row, productMap) => {
+  const raw = row.sp_chinh_thuong || (productMap && productMap[row.id_sp]?.sp_chinh_thuong);
+  return normalizeProductType(raw) === "thuong";
 };
 
 function SummaryCard({ label, value, color, labelColor, background, border }) {
@@ -63,7 +63,9 @@ export default function RatioTab() {
   };
 
   const { allRows, nvOptions, kenhOptions } = useMemo(() => {
-    const sales = data.DH_CT.filter((row) => isAllowedNcc(row.ncc));
+    const productMap = {};
+    (data.DS_SP || []).forEach((sp) => { if (sp.id) productMap[sp.id] = sp; });
+    const sales = data.DH_CT.filter((row) => isThuongProduct(row, productMap));
     const total = sales.reduce((sum, row) => sum + Number(row.thanh_tien || 0), 0);
     const byCustomer = {};
     sales.forEach((row) => {
@@ -80,7 +82,7 @@ export default function RatioTab() {
       nvOptions: [...new Set(data.KHACH_HANG.map((kh) => kh.nv_quan_ly).filter(Boolean))].sort(),
       kenhOptions: [...new Set(data.KHACH_HANG.map((kh) => kh.kenh).filter(Boolean))].sort()
     };
-  }, [data.DH_CT, data.KHACH_HANG]);
+  }, [data.DH_CT, data.KHACH_HANG, data.DS_SP]);
 
   const rows = allRows
     .filter((r) => {
@@ -163,7 +165,7 @@ export default function RatioTab() {
         </div>
 
         <div style={{ background: "#fff7ed", border: "1px solid #ffedd5", padding: "10px 14px", borderRadius: 10, fontSize: 12, color: "#9a3412", marginBottom: 20 }}>
-          <strong>Điều kiện tính toán:</strong> Chỉ tính doanh thu của các đơn hàng có Nhà cung cấp (NCC) là <strong>Lock&amp;king</strong> hoặc <strong>Takin</strong>.
+          <strong>Điều kiện tính toán:</strong> Chỉ tính doanh thu của các sản phẩm loại <strong>THƯỜNG</strong>.
         </div>
 
         <div className="summary-card-inner" style={{ marginBottom: 24 }}>
