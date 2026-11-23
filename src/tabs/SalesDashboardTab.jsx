@@ -92,6 +92,12 @@ const SALES_TYPES = [
   { key: "r1", label: "R1", color: "#ea580c" }
 ];
 
+const TYPE_COLOR_MAP = {
+  "THƯỜNG": "#2563eb",
+  "CHÍNH": "#7c3aed",
+  "R1": "#ea580c"
+};
+
 const PRODUCT_TYPE_OPTIONS = [
   { value: "chinh", label: "SP Chính", showValue: false },
   { value: "thuong", label: "SP Thường", showValue: false },
@@ -385,8 +391,8 @@ export default function SalesDashboardTab() {
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: 16 }}>
         <SummaryCard label="TỔNG DOANH SỐ" value={money(stats.totalSales)} color="#2d5bff" />
-        {stats.typeTotals.map(([type, total], index) => {
-          const color = TYPE_COLORS[index % TYPE_COLORS.length];
+        {stats.typeTotals.filter(([type]) => type && type !== "KHÁC").map(([type, total], index) => {
+          const color = TYPE_COLOR_MAP[type] || TYPE_COLORS[index % TYPE_COLORS.length];
           return <SummaryCard key={type} label={type} value={money(total)} color={color} labelColor={color} />;
         })}
         <SummaryCard label="TỔNG NỢ PHÁT SINH" value={money(stats.totalIncurred)} color="#ef4444" />

@@ -55,6 +55,7 @@ function buildDayRows(salesByDay, typesByDay) {
 }
 
 const TYPE_NAMES = { chinh: "CHÍNH", thuong: "THƯỜNG", r1: "R1" };
+const TYPE_ORDER = { "THƯỜNG": 1, "CHÍNH": 2, "R1": 3 };
 
 const newNvStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, chiCM: 0, thuCM: 0, chiLM: 0, luyKe: 0 });
 const newKhStats = () => ({ c: 0, s: 0, chi: 0, thu: 0, luyKe: 0 });
@@ -130,7 +131,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs, product
       if (!typesByDay[dayKey]) typesByDay[dayKey] = { thuong: 0, chinh: 0, r1: 0 };
       typesByDay[dayKey][productType] += amount;
     }
-    const type = TYPE_NAMES[productType] || String(item.sp_chinh_thuong || "").trim().toUpperCase() || "KHÁC";
+    const type = TYPE_NAMES[productType];
     if (!type) return;
     typeTotals[type] = (typeTotals[type] || 0) + amount;
   });
@@ -272,7 +273,9 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs, product
   return {
     totalSales,
     orderCount: orders.length,
-    typeTotals: Object.entries(typeTotals),
+    typeTotals: Object.entries(typeTotals).sort(
+      ([a], [b]) => (TYPE_ORDER[a] || 99) - (TYPE_ORDER[b] || 99)
+    ),
     totalIncurred,
     totalCollected,
     monthRows: monthsDesc.map((m) => ({ month: m, ...monthStats[m] })),
