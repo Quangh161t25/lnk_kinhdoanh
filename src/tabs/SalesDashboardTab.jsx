@@ -92,6 +92,12 @@ const SALES_TYPES = [
   { key: "r1", label: "R1", color: "#ea580c" }
 ];
 
+const PRODUCT_TYPE_OPTIONS = [
+  { value: "chinh", label: "SP Chính", showValue: false },
+  { value: "thuong", label: "SP Thường", showValue: false },
+  { value: "r1", label: "SP R1", showValue: false }
+];
+
 const CHART_MODES = [
   { id: 1, title: "Tổng doanh số" },
   { id: 2, title: "Cột chồng: chia 3 khúc theo loại" },
@@ -288,6 +294,7 @@ export default function SalesDashboardTab() {
   const [month, setMonth] = useState("");
   const [nvs, setNvs] = useState([]);
   const [khs, setKhs] = useState([]);
+  const [productTypes, setProductTypes] = useState([]);
   const [productSearch, setProductSearch] = useState("");
   const [khPage, setKhPage] = useState(1);
   const [spPage, setSpPage] = useState(1);
@@ -303,8 +310,8 @@ export default function SalesDashboardTab() {
   const khOptions = useMemo(() => data.KHACH_HANG.map((c) => ({ value: c.id, label: c.ten_kh })).filter((k) => k.value), [data.KHACH_HANG]);
 
   const stats = useMemo(
-    () => computeSalesDashboard(data, nvOptions.map((o) => o.value), { month, nvs, khs }),
-    [data, nvOptions, month, nvs, khs]
+    () => computeSalesDashboard(data, nvOptions.map((o) => o.value), { month, nvs, khs, productTypes }),
+    [data, nvOptions, month, nvs, khs, productTypes]
   );
 
   // Bỏ các tháng không có doanh số (chỉ có công nợ) khỏi biểu đồ.
@@ -328,6 +335,13 @@ export default function SalesDashboardTab() {
 
   const resetPages = () => { setKhPage(1); setSpPage(1); };
   const changeFilter = (setter) => (value) => { setter(value); resetPages(); };
+  const clearAllFilters = () => {
+    setMonth("");
+    setNvs([]);
+    setKhs([]);
+    setProductTypes([]);
+    resetPages();
+  };
 
   const term = productSearch.trim().toLowerCase();
   const products = stats.productRows
@@ -361,6 +375,10 @@ export default function SalesDashboardTab() {
             </div>
             <MultiSelect items={nvOptions} selected={nvs} onChange={changeFilter(setNvs)} label="ID Nhân viên" searchPlaceholder="Tìm ID nhân viên..." />
             <MultiSelect items={khOptions} selected={khs} onChange={changeFilter(setKhs)} label="ID Khách hàng" searchPlaceholder="Tìm ID khách hàng..." />
+            <MultiSelect items={PRODUCT_TYPE_OPTIONS} selected={productTypes} onChange={changeFilter(setProductTypes)} label="Loại sản phẩm" searchPlaceholder="Tìm loại SP..." />
+            {(month || nvs.length > 0 || khs.length > 0 || productTypes.length > 0) && (
+              <button type="button" className="btn btn-secondary" style={{ height: 36, padding: "0 10px", fontSize: 12.5 }} onClick={clearAllFilters}>Xóa lọc</button>
+            )}
           </div>
         </div>
       </div>

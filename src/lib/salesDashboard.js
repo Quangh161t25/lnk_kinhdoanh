@@ -70,9 +70,20 @@ const bySalesThenDebt = (stats) => (a, b) => {
 /**
  * @param data      dữ liệu đã chuẩn hóa (DH, DH_CT, CONG_NO)
  * @param staffIds  mã NV hiển thị sẵn trong bảng nhân viên (kể cả khi chưa có số liệu)
- * @param filters   { month: "yyyy-mm" | "", nvs: string[], khs: string[] }
+ * @param filters   { month: "yyyy-mm" | "", nvs: string[], khs: string[], productTypes: string[] }
  */
-export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
+export function computeSalesDashboard(data, staffIds, { month, nvs, khs, productTypes = [] }) {
+  const productMap = {};
+  (data.DS_SP || []).forEach((sp) => { if (sp && sp.id) productMap[sp.id] = sp; });
+
+  const hasProductTypeFilter = Array.isArray(productTypes) && productTypes.length > 0;
+  const matchesProductType = (item) => {
+    if (!hasProductTypeFilter) return true;
+    const raw = item.sp_chinh_thuong || productMap[item.id_sp]?.sp_chinh_thuong;
+    const pType = normalizeProductType(raw) || "khac";
+    return productTypes.includes(pType);
+  };
+
   const matchesFilters = (row, customerField) => {
     if (month && toYearMonth(row.ngay) !== month) return false;
     if (nvs.length > 0 && !nvs.includes(row.id_nv)) return false;
@@ -80,20 +91,37 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
     return true;
   };
 
-  const orders = data.DH.filter((d) => {
-    if (d.nhap_xuat && d.nhap_xuat.toLowerCase() !== "xuat") return false;
-    return matchesFilters(d, "npp");
+  // Tính doanh số theo từng đơn từ các dòng DH_CT khớp bộ lọc và loại sản phẩm
+  const orderSalesMap = {};
+  const matchingOrderIds = new Set();
+  data.DH_CT.forEach((item) => {
+    if (!matchesFilters(item, "npp")) return;
+    if (!matchesProductType(item)) return;
+    const orderId = String(item.id_dh || "").trim();
+    const amount = Number(item.thanh_tien || (Number(item.don_gia || 0) * Number(item.slg || 1)));
+    if (orderId) {
+      orderSalesMap[orderId] = (orderSalesMap[orderId] || 0) + amount;
+      matchingOrderIds.add(orderId);
+    }
   });
 
-  const totalSales = orders.reduce((s, d) => s + Number(d.thanh_tien || 0), 0);
+  const orders = data.DH.filter((d) => {
+    if (d.nhap_xuat && d.nhap_xuat.toLowerCase() !== "xuat") return false;
+    if (!matchesFilters(d, "npp")) return false;
+    if (hasProductTypeFilter && !matchingOrderIds.has(d.id)) return false;
+    return true;
+  });
 
-  // Doanh số theo loại SP (chính/thường/...) từ DH_CT; bỏ qua dòng chưa phân loại.
+  const getOrderSales = (d) => (hasProductTypeFilter ? (orderSalesMap[d.id] || 0) : Number(d.thanh_tien || 0));
+  const totalSales = orders.reduce((s, d) => s + getOrderSales(d), 0);
+
+  // Doanh số theo loại SP (chính/thường/...) từ DH_CT; bỏ qua dòng chưa phân loại hoặc bị lọc.
   const typeTotals = {};
   const typesByMonth = {};
   const typesByDay = {};
-  data.DH_CT.filter((item) => matchesFilters(item, "npp")).forEach((item) => {
-    const amount = Number(item.thanh_tien || 0);
-    const productType = normalizeProductType(item.sp_chinh_thuong);
+  data.DH_CT.filter((item) => matchesFilters(item, "npp") && matchesProductType(item)).forEach((item) => {
+    const amount = Number(item.thanh_tien || (Number(item.don_gia || 0) * Number(item.slg || 1)));
+    const productType = normalizeProductType(item.sp_chinh_thuong || productMap[item.id_sp]?.sp_chinh_thuong);
     if (productType) {
       const m = toMonthLabel(item.ngay);
       if (!typesByMonth[m]) typesByMonth[m] = { thuong: 0, chinh: 0, r1: 0 };
@@ -102,7 +130,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
       if (!typesByDay[dayKey]) typesByDay[dayKey] = { thuong: 0, chinh: 0, r1: 0 };
       typesByDay[dayKey][productType] += amount;
     }
-    const type = TYPE_NAMES[productType] || String(item.sp_chinh_thuong || "").trim().toUpperCase();
+    const type = TYPE_NAMES[productType] || String(item.sp_chinh_thuong || "").trim().toUpperCase() || "KHÁC";
     if (!type) return;
     typeTotals[type] = (typeTotals[type] || 0) + amount;
   });
@@ -117,25 +145,26 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
   const salesByMonth = {};
   const salesByDay = {};
   orders.forEach((d) => {
+    const sAmount = getOrderSales(d);
     const m = toMonthLabel(d.ngay);
     if (!salesByMonth[m]) salesByMonth[m] = { c: 0, s: 0, days: {} };
     salesByMonth[m].c++;
-    salesByMonth[m].s += Number(d.thanh_tien || 0);
+    salesByMonth[m].s += sAmount;
     const day = parseDateSort(d.ngay);
-    salesByMonth[m].days[day] = (salesByMonth[m].days[day] || 0) + Number(d.thanh_tien || 0);
+    salesByMonth[m].days[day] = (salesByMonth[m].days[day] || 0) + sAmount;
     if (!salesByDay[day]) salesByDay[day] = { s: 0, c: 0 };
-    salesByDay[day].s += Number(d.thanh_tien || 0);
+    salesByDay[day].s += sAmount;
     salesByDay[day].c++;
 
     const n = d.id_nv || "N/A";
     if (!nvStats[n]) nvStats[n] = newNvStats();
     nvStats[n].c++;
-    nvStats[n].s += Number(d.thanh_tien || 0);
+    nvStats[n].s += sAmount;
 
     const k = d.npp || "N/A";
     if (!khStats[k]) khStats[k] = newKhStats();
     khStats[k].c++;
-    khStats[k].s += Number(d.thanh_tien || 0);
+    khStats[k].s += sAmount;
   });
 
   const monthLabel = month ? month.split("-").reverse().join("/") : null;
@@ -215,13 +244,14 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
   const khKeys = Object.keys(khStats).sort(bySalesThenDebt(khStats))
     .filter((k) => k !== "N/A" || khStats[k].s > 0 || khStats[k].luyKe !== 0);
 
-  // Doanh số theo NCC và theo sản phẩm: chỉ các dòng thuộc đơn đã lọc.
+  // Doanh số theo NCC và theo sản phẩm: chỉ các dòng thuộc đơn đã lọc và khớp loại SP.
   const validOrderIds = new Set(orders.map((d) => d.id));
   const nccTotals = {};
   data.DH_CT.forEach((detail) => {
     if (!validOrderIds.has(detail.id_dh)) return;
+    if (!matchesProductType(detail)) return;
     const name = detail.ncc || "N/A";
-    nccTotals[name] = (nccTotals[name] || 0) + Number(detail.thanh_tien || 0);
+    nccTotals[name] = (nccTotals[name] || 0) + Number(detail.thanh_tien || (Number(detail.don_gia || 0) * Number(detail.slg || 1)));
   });
   const nccRows = Object.keys(nccTotals).sort((a, b) => nccTotals[b] - nccTotals[a]).map((name) => ({ name, s: nccTotals[name] }));
 
@@ -229,6 +259,7 @@ export function computeSalesDashboard(data, staffIds, { month, nvs, khs }) {
   data.DH_CT.forEach((detail) => {
     if (detail.id_dh && !validOrderIds.has(detail.id_dh)) return;
     if (!detail.id_dh && !matchesFilters(detail, "npp")) return;
+    if (!matchesProductType(detail)) return;
     const spId = String(detail.id_sp || "").trim();
     if (!spId) return;
     if (!productStats[spId]) productStats[spId] = { id: spId, slg: 0, thanh_tien: 0 };

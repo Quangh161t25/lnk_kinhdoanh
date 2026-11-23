@@ -18,7 +18,13 @@ export default function MultiSelect({ items, selected, onChange, label, searchPl
   const q = query.toLowerCase();
   const visible = items.filter((it) => String(it.label ?? "").toLowerCase().includes(q) || String(it.value).toLowerCase().includes(q));
   const allChecked = chosen.size > 0 && chosen.size === items.length;
-  const buttonText = chosen.size === 0 ? label : allChecked ? "Tất cả " + label : `Đã chọn (${chosen.size})`;
+  const buttonText = chosen.size === 0
+    ? label
+    : allChecked
+      ? "Tất cả " + label
+      : chosen.size === 1
+        ? (items.find((it) => chosen.has(it.value))?.label || "Đã chọn (1)")
+        : `Đã chọn (${chosen.size})`;
 
   const toggle = (value) => {
     const next = new Set(chosen);
@@ -35,7 +41,10 @@ export default function MultiSelect({ items, selected, onChange, label, searchPl
           {visible.map((it, index) => (
             <div key={`${it.value}-${index}`} className="ms-option" onClick={() => toggle(it.value)}>
               <input type="checkbox" value={it.value} checked={chosen.has(it.value)} readOnly />
-              <label>{it.label} <small>({it.value})</small></label>
+              <label>
+                {it.label}
+                {it.showValue !== false && it.value && it.value !== it.label ? <small> ({it.value})</small> : null}
+              </label>
             </div>
           ))}
         </div>
