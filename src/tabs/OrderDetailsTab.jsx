@@ -230,7 +230,9 @@ export default function OrderDetailsTab() {
           { key: "thanh_tien", label: "Thành tiền", align: "right", render: (item) => <strong style={{ color: "var(--brand)" }}>{money(item.thanh_tien)}</strong>, footer: money(sumTotal), footerStyle: { color: "var(--brand)" } }
         ]}
         rows={rows}
-        pageSize={25}
+        pageSize={100}
+        pageNoun="dòng"
+        topPager
         rowKey={(item, index) => `${item.id}-${index}`}
         rowProps={(item) => ({ "data-action": "view-order-detail", style: { cursor: "pointer" }, onDoubleClick: () => openOrderDrawer(drawer, data, item.id_dh) })}
         empty="Không tìm thấy chi tiết đơn hàng."

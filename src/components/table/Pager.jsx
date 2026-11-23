@@ -9,14 +9,18 @@ export function paginate(rows, page, pageSize) {
   return { page: current, totalPages, start, rows: rows.slice(start, start + pageSize) };
 }
 
-// Các số trang hiển thị: trang hiện tại ±2, luôn có trang đầu/cuối, chỗ trống thành "…".
+// Các số trang hiển thị: hiển thị tối đa 5 trang liên tiếp quanh trang hiện tại, luôn có trang đầu/cuối.
 function pageNumbers(page, totalPages) {
-  const pages = [];
-  for (let p = 1; p <= totalPages; p++) {
-    if (p === 1 || p === totalPages || Math.abs(p - page) <= 2) pages.push(p);
-    else if (pages[pages.length - 1] !== "…") pages.push("…");
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
-  return pages;
+  if (page <= 4) {
+    return [1, 2, 3, 4, 5, "…", totalPages];
+  }
+  if (page >= totalPages - 3) {
+    return [1, "…", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+  return [1, "…", page - 1, page, page + 1, "…", totalPages];
 }
 
 // Thanh phân trang: "Hiển thị 1 - 25 / 42 dòng", chọn cỡ trang, nút « ‹ 1 2 3 › ».

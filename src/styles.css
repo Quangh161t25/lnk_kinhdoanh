@@ -1986,8 +1986,20 @@ tbody tr[data-action="view-order-detail"]:hover {
 
 .dt-toolbar {
   display: flex;
-  justify-content: flex-end;
-  padding: 0 0 8px
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 0 0 10px;
+}
+
+.dt-toolbar .dt-settings-btn {
+  margin-left: auto;
+}
+
+.dt-toolbar .pager-bar {
+  padding: 0;
+  flex: 1;
 }
 
 .dt-settings-btn {
@@ -2791,7 +2803,9 @@ tbody tr.dt-selected:hover {
 .pager-size {
   display: inline-flex;
   align-items: center;
-  gap: 6px
+  gap: 6px;
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
 }
 
 .pager-size select {
@@ -2809,7 +2823,17 @@ tbody tr.dt-selected:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: auto
+  margin-left: auto;
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .pager-size,
+  .pager-nav {
+    border-left: none;
+    padding-left: 0;
+  }
 }
 
 .pager-label {

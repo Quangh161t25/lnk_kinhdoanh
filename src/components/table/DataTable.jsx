@@ -21,6 +21,7 @@ export default function DataTable({
   id, name, columns, rows: allRows, rowKey, rowProps,
   empty = "Trống", after, footerLabel, footerRowStyle, selection,
   pageSize, page: controlledPage, onPage: controlledOnPage, pageNoun = "dòng",
+  topPager = false, bottomPager = true,
   wrapClassName = "table-wrap", wrapStyle, tableStyle, theadStyle, tfootStyle, toolbarStyle
 }) {
   const [settings, update, reset] = useTableSettings(id);
@@ -139,9 +140,24 @@ export default function DataTable({
     settings.headerWrap && "dt-head-wrap"
   ].filter(Boolean).join(" ");
 
+  const renderPager = () => (
+    <Pager
+      total={sorted.length}
+      page={paged.page}
+      totalPages={paged.totalPages}
+      start={paged.start}
+      shown={rows.length}
+      pageSize={size}
+      noun={pageNoun}
+      onPage={onPage}
+      onPageSize={changePageSize}
+    />
+  );
+
   return (
     <>
       <div className="dt-toolbar" style={toolbarStyle}>
+        {topPager && paged && sorted.length > 0 && renderPager()}
         <button type="button" className={`dt-settings-btn${isCustomized(settings) ? " active" : ""}`} onClick={() => setOpen(true)}
           title="Tùy chỉnh cột: thứ tự, ẩn/hiện, căn lề, độ rộng…" aria-label="Tùy chỉnh cột">
           <svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>
@@ -221,10 +237,7 @@ export default function DataTable({
           )}
         </table>
       </div>
-      {paged && sorted.length > 0 && (
-        <Pager total={sorted.length} page={paged.page} totalPages={paged.totalPages} start={paged.start} shown={rows.length}
-          pageSize={size} noun={pageNoun} onPage={onPage} onPageSize={changePageSize} />
-      )}
+      {bottomPager && paged && sorted.length > 0 && renderPager()}
       {open && (
         <ColumnSettings
           name={name}
