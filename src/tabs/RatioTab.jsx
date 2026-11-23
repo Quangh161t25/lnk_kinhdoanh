@@ -29,7 +29,7 @@ function SummaryCard({ label, value, color, labelColor, background, border }) {
 
 const SUMMARY_HEAD = { ...SUMMARY_CELL, background: "#f8fafc" };
 const RATIO_STAFF_COLUMNS = [
-  { key: "nv", label: "NHÂN VIÊN QUẢN LÝ", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 700, color: "#475569" }, render: (s) => s.nv },
+  { key: "nv", label: "NHÂN VIÊN", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 700, color: "#475569" }, render: (s) => s.nv },
   { key: "ds", label: "DOANH THU ĐẠT", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 600 }, render: (s) => money(s.ds) },
   { key: "tt", label: "TỈ TRỌNG KPI (%)", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, color: "#6366f1", fontWeight: 700 }, render: (s) => `${(s.tt_tong * 100).toFixed(2)}%` },
   { key: "kpi", label: "KPI NĂM 2026", align: "right", headerStyle: SUMMARY_HEAD, style: { ...SUMMARY_CELL, fontWeight: 600 }, render: (s) => money(s.kpi) },
@@ -40,7 +40,7 @@ const RATIO_STAFF_COLUMNS = [
 const RATIO_CUSTOMER_COLUMNS = [
   { key: "id", label: "ID", headerStyle: { width: 100 }, className: "mono", render: (r) => r.id },
   { key: "ten_kh", label: "KHÁCH HÀNG", style: { fontWeight: 600 }, render: (r) => r.ten_kh },
-  { key: "nv", label: "NV QUẢN LÝ", headerStyle: { width: 180 }, render: (r) => r.nv_quan_ly },
+  { key: "nv", label: "NHÂN VIÊN", headerStyle: { width: 180 }, render: (r) => r.nv_quan_ly },
   { key: "kenh", label: "KÊNH", headerStyle: { width: 120 }, render: (r) => <span className="badge" style={{ background: r.kenh === "ONLINE" ? "#e0f2fe" : "#f1f5f9", color: r.kenh === "ONLINE" ? "#0369a1" : "#475569" }}>{r.kenh}</span> },
   { key: "doanh_thu", label: "DOANH THU", align: "right", style: { fontWeight: 600 }, render: (r) => money(r.doanh_thu) },
   { key: "ti_trong", label: "TỈ TRỌNG (%)", align: "right", style: { color: "var(--brand)", fontWeight: 700 }, render: (r) => `${(r.ti_trong * 100).toFixed(2)}%` },
@@ -62,24 +62,83 @@ export default function RatioTab() {
     setKhInput(next.khText);
   };
 
-  const { allRows, nvOptions, kenhOptions } = useMemo(() => {
+  const { allRows, nvOptions, kenhOptions, defaultStaffSummary } = useMemo(() => {
     const productMap = {};
     (data.DS_SP || []).forEach((sp) => { if (sp.id) productMap[sp.id] = sp; });
     const sales = data.DH_CT.filter((row) => isThuongProduct(row, productMap));
     const total = sales.reduce((sum, row) => sum + Number(row.thanh_tien || 0), 0);
+
+    // Gom doanh số theo khách hàng và theo nhân viên từ sheet DH_CT (sheet đơn hàng)
     const byCustomer = {};
+    const customerStaffMap = {}; // khId -> { [nv]: amount }
+    const staffTotals = {};      // nv -> total sales
+
     sales.forEach((row) => {
       const npp = String(row.npp || "").trim();
-      if (npp) byCustomer[npp] = (byCustomer[npp] || 0) + Number(row.thanh_tien || 0);
+      const nv = String(row.id_nv || "").trim() || "Chưa phân công";
+      const amt = Number(row.thanh_tien || 0);
+
+      staffTotals[nv] = (staffTotals[nv] || 0) + amt;
+
+      if (npp) {
+        byCustomer[npp] = (byCustomer[npp] || 0) + amt;
+        if (!customerStaffMap[npp]) customerStaffMap[npp] = {};
+        customerStaffMap[npp][nv] = (customerStaffMap[npp][nv] || 0) + amt;
+      }
     });
+
+    // Nhân viên chính của khách hàng lấy theo sheet đơn hàng (người có doanh số cao nhất trên đơn)
+    const getStaffForCustomer = (khId, fallback) => {
+      const staffMap = customerStaffMap[khId];
+      if (!staffMap) return fallback || "Chưa phân công";
+      const sorted = Object.keys(staffMap).sort((a, b) => staffMap[b] - staffMap[a]);
+      return sorted[0] || fallback || "Chưa phân công";
+    };
+
+    const customerRows = data.KHACH_HANG.map((kh) => {
+      const doanh_thu = byCustomer[kh.id] || 0;
+      const ti_trong = total > 0 ? doanh_thu / total : 0;
+      const kpi_2026 = Math.round(ti_trong * parseLooseNumber(kh.tt));
+      const nv = getStaffForCustomer(kh.id, kh.nv_quan_ly);
+      return {
+        id: kh.id,
+        ten_kh: kh.ten_kh,
+        nv_quan_ly: nv,
+        kenh: kh.kenh,
+        doanh_thu,
+        ti_trong,
+        kpi_2026,
+        kpi_thang_2026: Math.round(kpi_2026 / 12)
+      };
+    });
+
+    // Phân bổ KPI theo nhân viên dựa trên các khách hàng của nhân viên đó
+    const staffKpis = {};
+    customerRows.forEach((r) => {
+      const nv = r.nv_quan_ly || "Chưa phân công";
+      if (!staffKpis[nv]) staffKpis[nv] = { kpi: 0, kpi_thang: 0 };
+      staffKpis[nv].kpi += r.kpi_2026;
+      staffKpis[nv].kpi_thang += r.kpi_thang_2026;
+    });
+
+    const staffList = Object.keys(staffTotals).map((nv) => {
+      const ds = staffTotals[nv] || 0;
+      const tt_tong = total > 0 ? ds / total : 0;
+      const kpi = staffKpis[nv]?.kpi || 0;
+      const kpi_thang = staffKpis[nv]?.kpi_thang || Math.round(kpi / 12);
+      const ds_con_thieu = kpi - ds;
+      return { nv, ds, tt_tong, kpi, kpi_thang, ds_con_thieu };
+    }).sort((a, b) => b.ds - a.ds);
+
+    const allNvs = new Set([
+      ...Object.keys(staffTotals),
+      ...data.DH_CT.map((r) => String(r.id_nv || "").trim()).filter(Boolean)
+    ]);
+
     return {
-      allRows: data.KHACH_HANG.map((kh) => {
-        const doanh_thu = byCustomer[kh.id] || 0;
-        const ti_trong = total > 0 ? doanh_thu / total : 0;
-        const kpi_2026 = Math.round(ti_trong * parseLooseNumber(kh.tt));
-        return { id: kh.id, ten_kh: kh.ten_kh, nv_quan_ly: kh.nv_quan_ly, kenh: kh.kenh, doanh_thu, ti_trong, kpi_2026, kpi_thang_2026: Math.round(kpi_2026 / 12) };
-      }),
-      nvOptions: [...new Set(data.KHACH_HANG.map((kh) => kh.nv_quan_ly).filter(Boolean))].sort(),
+      allRows: customerRows,
+      defaultStaffSummary: staffList,
+      nvOptions: [...allNvs].sort(),
       kenhOptions: [...new Set(data.KHACH_HANG.map((kh) => kh.kenh).filter(Boolean))].sort()
     };
   }, [data.DH_CT, data.KHACH_HANG, data.DS_SP]);
@@ -93,16 +152,19 @@ export default function RatioTab() {
     })
     .sort((a, b) => b.doanh_thu - a.doanh_thu);
 
-  const byStaff = {};
-  rows.forEach((r) => {
-    const nv = r.nv_quan_ly || "Chưa phân công";
-    if (!byStaff[nv]) byStaff[nv] = { nv, ds: 0, tt_tong: 0, kpi: 0, kpi_thang: 0 };
-    byStaff[nv].ds += r.doanh_thu;
-    byStaff[nv].tt_tong += r.ti_trong;
-    byStaff[nv].kpi += r.kpi_2026;
-    byStaff[nv].kpi_thang += r.kpi_thang_2026;
-  });
-  const staffSummary = Object.values(byStaff).map((s) => ({ ...s, ds_con_thieu: s.kpi - s.ds })).sort((a, b) => b.ds - a.ds);
+  const staffSummary = useMemo(() => {
+    if (!filters.kh && !filters.nv && !filters.kenh) return defaultStaffSummary;
+    const byStaff = {};
+    rows.forEach((r) => {
+      const nv = r.nv_quan_ly || "Chưa phân công";
+      if (!byStaff[nv]) byStaff[nv] = { nv, ds: 0, tt_tong: 0, kpi: 0, kpi_thang: 0 };
+      byStaff[nv].ds += r.doanh_thu;
+      byStaff[nv].tt_tong += r.ti_trong;
+      byStaff[nv].kpi += r.kpi_2026;
+      byStaff[nv].kpi_thang += r.kpi_thang_2026;
+    });
+    return Object.values(byStaff).map((s) => ({ ...s, ds_con_thieu: s.kpi - s.ds })).sort((a, b) => b.ds - a.ds);
+  }, [defaultStaffSummary, rows, filters]);
 
   const totalSales = rows.reduce((sum, r) => sum + r.doanh_thu, 0);
   const totalKpi = rows.reduce((sum, r) => sum + r.kpi_2026, 0);
@@ -139,7 +201,7 @@ export default function RatioTab() {
             onClear={() => applyFilters({ kh: "", khText: "" })}
           />
           <div style={FILTER_BOX}>
-            <label style={FILTER_LABEL}>NV QUẢN LÝ:</label>
+            <label style={FILTER_LABEL}>NHÂN VIÊN:</label>
             <select style={{ ...FILTER_SELECT, minWidth: 110 }} value={filters.nv} onChange={(e) => applyFilters({ nv: e.target.value })}>
               <option value="">Tất cả</option>
               {nvOptions.map((nv) => <option key={nv} value={nv}>{nv}</option>)}
